@@ -3,82 +3,27 @@
   "title": "CodexAppServerProtocol",
   "type": "object",
   "definitions": {
-    "RequestId": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "RequestId",
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "integer",
-          "format": "int64"
-        }
-      ]
+    "AbsolutePathBuf": {
+      "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
+      "type": "string"
     },
-    "JSONRPCError": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "JSONRPCError",
-      "description": "A response to a request that indicates an error occurred.",
+    "AdditionalPermissionProfile": {
       "type": "object",
-      "required": ["error", "id"],
       "properties": {
-        "error": {
-          "$ref": "#/definitions/JSONRPCErrorError"
-        },
-        "id": {
-          "$ref": "#/definitions/v2/RequestId"
-        }
-      }
-    },
-    "JSONRPCErrorError": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "JSONRPCErrorError",
-      "type": "object",
-      "required": ["code", "message"],
-      "properties": {
-        "code": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "data": true,
-        "message": {
-          "type": "string"
-        }
-      }
-    },
-    "JSONRPCNotification": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "JSONRPCNotification",
-      "description": "A notification which does not expect a response.",
-      "type": "object",
-      "required": ["method"],
-      "properties": {
-        "method": {
-          "type": "string"
-        },
-        "params": true
-      }
-    },
-    "JSONRPCRequest": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "JSONRPCRequest",
-      "description": "A request that expects a response.",
-      "type": "object",
-      "required": ["id", "method"],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/v2/RequestId"
-        },
-        "method": {
-          "type": "string"
-        },
-        "params": true,
-        "trace": {
-          "description": "Optional W3C Trace Context for distributed tracing.",
+        "fileSystem": {
           "anyOf": [
             {
-              "$ref": "#/definitions/W3cTraceContext"
+              "$ref": "#/definitions/v2/AdditionalFileSystemPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/v2/AdditionalNetworkPermissions"
             },
             {
               "type": "null"
@@ -87,48 +32,86 @@
         }
       }
     },
-    "JSONRPCResponse": {
+    "ApplyPatchApprovalParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "JSONRPCResponse",
-      "description": "A successful (non-error) response to a request.",
+      "title": "ApplyPatchApprovalParams",
       "type": "object",
-      "required": ["id", "result"],
+      "required": ["callId", "conversationId", "fileChanges"],
       "properties": {
-        "id": {
-          "$ref": "#/definitions/v2/RequestId"
+        "callId": {
+          "description": "Use to correlate this with [codex_protocol::protocol::PatchApplyBeginEvent] and [codex_protocol::protocol::PatchApplyEndEvent].",
+          "type": "string"
         },
-        "result": true
-      }
-    },
-    "W3cTraceContext": {
-      "type": "object",
-      "properties": {
-        "traceparent": {
+        "conversationId": {
+          "$ref": "#/definitions/v2/ThreadId"
+        },
+        "fileChanges": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/FileChange"
+          }
+        },
+        "grantRoot": {
+          "description": "When set, the agent is asking the user to allow writes under this root for the remainder of the session (unclear if this is honored today).",
           "type": ["string", "null"]
         },
-        "tracestate": {
+        "reason": {
+          "description": "Optional explanatory reason (e.g. request for extra write access).",
           "type": ["string", "null"]
         }
       }
     },
-    "JSONRPCMessage": {
+    "ApplyPatchApprovalResponse": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "JSONRPCMessage",
-      "description": "Refers to any valid JSON-RPC object that can be decoded off the wire, or encoded to be sent.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/JSONRPCRequest"
+      "title": "ApplyPatchApprovalResponse",
+      "type": "object",
+      "required": ["decision"],
+      "properties": {
+        "decision": {
+          "$ref": "#/definitions/ReviewDecision"
+        }
+      }
+    },
+    "ChatgptAuthTokensRefreshParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatgptAuthTokensRefreshParams",
+      "type": "object",
+      "required": ["reason"],
+      "properties": {
+        "previousAccountId": {
+          "description": "Workspace/account identifier that Codex was previously using.\n\nClients that manage multiple accounts/workspaces can use this as a hint to refresh the token for the correct workspace.\n\nThis may be `null` when the prior auth state did not include a workspace identifier (`chatgpt_account_id`).",
+          "type": ["string", "null"]
         },
+        "reason": {
+          "$ref": "#/definitions/ChatgptAuthTokensRefreshReason"
+        }
+      }
+    },
+    "ChatgptAuthTokensRefreshReason": {
+      "oneOf": [
         {
-          "$ref": "#/definitions/JSONRPCNotification"
-        },
-        {
-          "$ref": "#/definitions/JSONRPCResponse"
-        },
-        {
-          "$ref": "#/definitions/JSONRPCError"
+          "description": "Codex attempted a backend request and received `401 Unauthorized`.",
+          "type": "string",
+          "enum": ["unauthorized"]
         }
       ]
+    },
+    "ChatgptAuthTokensRefreshResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatgptAuthTokensRefreshResponse",
+      "type": "object",
+      "required": ["accessToken", "chatgptAccountId"],
+      "properties": {
+        "accessToken": {
+          "type": "string"
+        },
+        "chatgptAccountId": {
+          "type": "string"
+        },
+        "chatgptPlanType": {
+          "type": ["string", "null"]
+        }
+      }
     },
     "ClientInfo": {
       "type": "object",
@@ -145,155 +128,23 @@
         }
       }
     },
-    "FuzzyFileSearchParams": {
+    "ClientNotification": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchParams",
-      "type": "object",
-      "required": ["query", "roots"],
-      "properties": {
-        "cancellationToken": {
-          "type": ["string", "null"]
-        },
-        "query": {
-          "type": "string"
-        },
-        "roots": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "ExecCommandApprovalResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ExecCommandApprovalResponse",
-      "type": "object",
-      "required": ["decision"],
-      "properties": {
-        "decision": {
-          "$ref": "#/definitions/ReviewDecision"
-        }
-      }
-    },
-    "ApplyPatchApprovalResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ApplyPatchApprovalResponse",
-      "type": "object",
-      "required": ["decision"],
-      "properties": {
-        "decision": {
-          "$ref": "#/definitions/ReviewDecision"
-        }
-      }
-    },
-    "ReviewDecision": {
-      "description": "User's decision in response to an ExecApprovalRequest.",
+      "title": "ClientNotification",
       "oneOf": [
         {
-          "description": "User has approved this command and the agent should execute it.",
-          "type": "string",
-          "enum": ["approved"]
-        },
-        {
-          "description": "User has approved this command and wants to apply the proposed execpolicy amendment so future matching commands are permitted.",
           "type": "object",
-          "required": ["approved_execpolicy_amendment"],
+          "required": ["method"],
           "properties": {
-            "approved_execpolicy_amendment": {
-              "type": "object",
-              "required": ["proposed_execpolicy_amendment"],
-              "properties": {
-                "proposed_execpolicy_amendment": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
+            "method": {
+              "type": "string",
+              "enum": ["initialized"],
+              "title": "InitializedNotificationMethod"
             }
           },
-          "additionalProperties": false,
-          "title": "ApprovedExecpolicyAmendmentReviewDecision"
-        },
-        {
-          "description": "User has approved this request and wants future prompts in the same session-scoped approval cache to be automatically approved for the remainder of the session.",
-          "type": "string",
-          "enum": ["approved_for_session"]
-        },
-        {
-          "description": "User chose to persist a network policy rule (allow/deny) for future requests to the same host.",
-          "type": "object",
-          "required": ["network_policy_amendment"],
-          "properties": {
-            "network_policy_amendment": {
-              "type": "object",
-              "required": ["network_policy_amendment"],
-              "properties": {
-                "network_policy_amendment": {
-                  "$ref": "#/definitions/NetworkPolicyAmendment"
-                }
-              }
-            }
-          },
-          "additionalProperties": false,
-          "title": "NetworkPolicyAmendmentReviewDecision"
-        },
-        {
-          "description": "User has denied this command and the agent should not execute it, but it should continue the session and try something else.",
-          "type": "string",
-          "enum": ["denied"]
-        },
-        {
-          "description": "Automatic approval review timed out before reaching a decision.",
-          "type": "string",
-          "enum": ["timed_out"]
-        },
-        {
-          "description": "User has denied this command and the agent should not do anything until the user's next command.",
-          "type": "string",
-          "enum": ["abort"]
+          "title": "InitializedNotification"
         }
       ]
-    },
-    "InitializeCapabilities": {
-      "description": "Client-declared capabilities negotiated during initialize.",
-      "type": "object",
-      "properties": {
-        "experimentalApi": {
-          "description": "Opt into receiving experimental API methods and fields.",
-          "default": false,
-          "type": "boolean"
-        },
-        "optOutNotificationMethods": {
-          "description": "Exact notification method names that should be suppressed for this connection (for example `thread/started`).",
-          "type": ["array", "null"],
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "InitializeParams": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "InitializeParams",
-      "type": "object",
-      "required": ["clientInfo"],
-      "properties": {
-        "capabilities": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/InitializeCapabilities"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "clientInfo": {
-          "$ref": "#/definitions/ClientInfo"
-        }
-      }
     },
     "ClientRequest": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1568,84 +1419,6 @@
         }
       ]
     },
-    "AdditionalPermissionProfile": {
-      "type": "object",
-      "properties": {
-        "fileSystem": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/v2/AdditionalFileSystemPermissions"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "network": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/v2/AdditionalNetworkPermissions"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
-    "ApplyPatchApprovalParams": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ApplyPatchApprovalParams",
-      "type": "object",
-      "required": ["callId", "conversationId", "fileChanges"],
-      "properties": {
-        "callId": {
-          "description": "Use to correlate this with [codex_protocol::protocol::PatchApplyBeginEvent] and [codex_protocol::protocol::PatchApplyEndEvent].",
-          "type": "string"
-        },
-        "conversationId": {
-          "$ref": "#/definitions/v2/ThreadId"
-        },
-        "fileChanges": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/FileChange"
-          }
-        },
-        "grantRoot": {
-          "description": "When set, the agent is asking the user to allow writes under this root for the remainder of the session (unclear if this is honored today).",
-          "type": ["string", "null"]
-        },
-        "reason": {
-          "description": "Optional explanatory reason (e.g. request for extra write access).",
-          "type": ["string", "null"]
-        }
-      }
-    },
-    "ChatgptAuthTokensRefreshParams": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ChatgptAuthTokensRefreshParams",
-      "type": "object",
-      "required": ["reason"],
-      "properties": {
-        "previousAccountId": {
-          "description": "Workspace/account identifier that Codex was previously using.\n\nClients that manage multiple accounts/workspaces can use this as a hint to refresh the token for the correct workspace.\n\nThis may be `null` when the prior auth state did not include a workspace identifier (`chatgpt_account_id`).",
-          "type": ["string", "null"]
-        },
-        "reason": {
-          "$ref": "#/definitions/ChatgptAuthTokensRefreshReason"
-        }
-      }
-    },
-    "ChatgptAuthTokensRefreshReason": {
-      "oneOf": [
-        {
-          "description": "Codex attempted a backend request and received `401 Unauthorized`.",
-          "type": "string",
-          "enum": ["unauthorized"]
-        }
-      ]
-    },
     "CommandExecutionApprovalDecision": {
       "oneOf": [
         {
@@ -1781,6 +1554,17 @@
         }
       }
     },
+    "CommandExecutionRequestApprovalResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CommandExecutionRequestApprovalResponse",
+      "type": "object",
+      "required": ["decision"],
+      "properties": {
+        "decision": {
+          "$ref": "#/definitions/CommandExecutionApprovalDecision"
+        }
+      }
+    },
     "DynamicToolCallParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "DynamicToolCallParams",
@@ -1802,6 +1586,23 @@
         },
         "turnId": {
           "type": "string"
+        }
+      }
+    },
+    "DynamicToolCallResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DynamicToolCallResponse",
+      "type": "object",
+      "required": ["contentItems", "success"],
+      "properties": {
+        "contentItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v2/DynamicToolCallOutputContentItem"
+          }
+        },
+        "success": {
+          "type": "boolean"
         }
       }
     },
@@ -1839,6 +1640,17 @@
         },
         "reason": {
           "type": ["string", "null"]
+        }
+      }
+    },
+    "ExecCommandApprovalResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExecCommandApprovalResponse",
+      "type": "object",
+      "required": ["decision"],
+      "properties": {
+        "decision": {
+          "$ref": "#/definitions/ReviewDecision"
         }
       }
     },
@@ -1894,6 +1706,30 @@
         }
       ]
     },
+    "FileChangeApprovalDecision": {
+      "oneOf": [
+        {
+          "description": "User approved the file changes.",
+          "type": "string",
+          "enum": ["accept"]
+        },
+        {
+          "description": "User approved the file changes and future changes to the same files should run without prompting.",
+          "type": "string",
+          "enum": ["acceptForSession"]
+        },
+        {
+          "description": "User denied the file changes. The agent will continue the turn.",
+          "type": "string",
+          "enum": ["decline"]
+        },
+        {
+          "description": "User denied the file changes. The turn will also be immediately interrupted.",
+          "type": "string",
+          "enum": ["cancel"]
+        }
+      ]
+    },
     "FileChangeRequestApprovalParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "FileChangeRequestApprovalParams",
@@ -1917,6 +1753,312 @@
         "turnId": {
           "type": "string"
         }
+      }
+    },
+    "FileChangeRequestApprovalResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FileChangeRequestApprovalResponse",
+      "type": "object",
+      "required": ["decision"],
+      "properties": {
+        "decision": {
+          "$ref": "#/definitions/FileChangeApprovalDecision"
+        }
+      }
+    },
+    "FuzzyFileSearchMatchType": {
+      "type": "string",
+      "enum": ["file", "directory"]
+    },
+    "FuzzyFileSearchParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchParams",
+      "type": "object",
+      "required": ["query", "roots"],
+      "properties": {
+        "cancellationToken": {
+          "type": ["string", "null"]
+        },
+        "query": {
+          "type": "string"
+        },
+        "roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "FuzzyFileSearchResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchResponse",
+      "type": "object",
+      "required": ["files"],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FuzzyFileSearchResult"
+          }
+        }
+      }
+    },
+    "FuzzyFileSearchResult": {
+      "description": "Superset of [`codex_file_search::FileMatch`]",
+      "type": "object",
+      "required": ["file_name", "match_type", "path", "root", "score"],
+      "properties": {
+        "file_name": {
+          "type": "string"
+        },
+        "indices": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "match_type": {
+          "$ref": "#/definitions/FuzzyFileSearchMatchType"
+        },
+        "path": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "score": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      }
+    },
+    "FuzzyFileSearchSessionCompletedNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchSessionCompletedNotification",
+      "type": "object",
+      "required": ["sessionId"],
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        }
+      }
+    },
+    "FuzzyFileSearchSessionUpdatedNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchSessionUpdatedNotification",
+      "type": "object",
+      "required": ["files", "query", "sessionId"],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FuzzyFileSearchResult"
+          }
+        },
+        "query": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        }
+      }
+    },
+    "GrantedPermissionProfile": {
+      "type": "object",
+      "properties": {
+        "fileSystem": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/v2/AdditionalFileSystemPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/v2/AdditionalNetworkPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "InitializeCapabilities": {
+      "description": "Client-declared capabilities negotiated during initialize.",
+      "type": "object",
+      "properties": {
+        "experimentalApi": {
+          "description": "Opt into receiving experimental API methods and fields.",
+          "default": false,
+          "type": "boolean"
+        },
+        "optOutNotificationMethods": {
+          "description": "Exact notification method names that should be suppressed for this connection (for example `thread/started`).",
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "InitializeParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "InitializeParams",
+      "type": "object",
+      "required": ["clientInfo"],
+      "properties": {
+        "capabilities": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InitializeCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clientInfo": {
+          "$ref": "#/definitions/ClientInfo"
+        }
+      }
+    },
+    "InitializeResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "InitializeResponse",
+      "type": "object",
+      "required": ["codexHome", "platformFamily", "platformOs", "userAgent"],
+      "properties": {
+        "codexHome": {
+          "description": "Absolute path to the server's $CODEX_HOME directory.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/v2/AbsolutePathBuf"
+            }
+          ]
+        },
+        "platformFamily": {
+          "description": "Platform family for the running app-server target, for example `\"unix\"` or `\"windows\"`.",
+          "type": "string"
+        },
+        "platformOs": {
+          "description": "Operating system for the running app-server target, for example `\"macos\"`, `\"linux\"`, or `\"windows\"`.",
+          "type": "string"
+        },
+        "userAgent": {
+          "type": "string"
+        }
+      }
+    },
+    "JSONRPCError": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "JSONRPCError",
+      "description": "A response to a request that indicates an error occurred.",
+      "type": "object",
+      "required": ["error", "id"],
+      "properties": {
+        "error": {
+          "$ref": "#/definitions/JSONRPCErrorError"
+        },
+        "id": {
+          "$ref": "#/definitions/v2/RequestId"
+        }
+      }
+    },
+    "JSONRPCErrorError": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "JSONRPCErrorError",
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "data": true,
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "JSONRPCMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "JSONRPCMessage",
+      "description": "Refers to any valid JSON-RPC object that can be decoded off the wire, or encoded to be sent.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/JSONRPCRequest"
+        },
+        {
+          "$ref": "#/definitions/JSONRPCNotification"
+        },
+        {
+          "$ref": "#/definitions/JSONRPCResponse"
+        },
+        {
+          "$ref": "#/definitions/JSONRPCError"
+        }
+      ]
+    },
+    "JSONRPCNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "JSONRPCNotification",
+      "description": "A notification which does not expect a response.",
+      "type": "object",
+      "required": ["method"],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "params": true
+      }
+    },
+    "JSONRPCRequest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "JSONRPCRequest",
+      "description": "A request that expects a response.",
+      "type": "object",
+      "required": ["id", "method"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/v2/RequestId"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": true,
+        "trace": {
+          "description": "Optional W3C Trace Context for distributed tracing.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/W3cTraceContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "JSONRPCResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "JSONRPCResponse",
+      "description": "A successful (non-error) response to a request.",
+      "type": "object",
+      "required": ["id", "result"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/v2/RequestId"
+        },
+        "result": true
       }
     },
     "McpElicitationArrayType": {
@@ -2128,12 +2270,12 @@
         "maxLength": {
           "type": ["integer", "null"],
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "minLength": {
           "type": ["integer", "null"],
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "title": {
           "type": ["string", "null"]
@@ -2180,12 +2322,12 @@
         "maxItems": {
           "type": ["integer", "null"],
           "format": "uint64",
-          "minimum": 0.0
+          "minimum": 0
         },
         "minItems": {
           "type": ["integer", "null"],
           "format": "uint64",
-          "minimum": 0.0
+          "minimum": 0
         },
         "title": {
           "type": ["string", "null"]
@@ -2256,12 +2398,12 @@
         "maxItems": {
           "type": ["integer", "null"],
           "format": "uint64",
-          "minimum": 0.0
+          "minimum": 0
         },
         "minItems": {
           "type": ["integer", "null"],
           "format": "uint64",
-          "minimum": 0.0
+          "minimum": 0
         },
         "title": {
           "type": ["string", "null"]
@@ -2296,6 +2438,10 @@
         }
       },
       "additionalProperties": false
+    },
+    "McpServerElicitationAction": {
+      "type": "string",
+      "enum": ["accept", "decline", "cancel"]
     },
     "McpServerElicitationRequestParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -2351,6 +2497,23 @@
         "turnId": {
           "description": "Active Codex turn when this elicitation was observed, if app-server could correlate one.\n\nThis is nullable because MCP models elicitation as a standalone server-to-client request identified by the MCP server request id. It may be triggered during a turn, but turn context is app-server correlation rather than part of the protocol identity of the elicitation itself.",
           "type": ["string", "null"]
+        }
+      }
+    },
+    "McpServerElicitationRequestResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "McpServerElicitationRequestResponse",
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "_meta": {
+          "description": "Optional client metadata for form-mode action handling."
+        },
+        "action": {
+          "$ref": "#/definitions/McpServerElicitationAction"
+        },
+        "content": {
+          "description": "Structured user input for accepted elicitations, mirroring RMCP `CreateElicitationResult`.\n\nThis is nullable because decline/cancel responses have no content."
         }
       }
     },
@@ -2462,6 +2625,10 @@
         }
       ]
     },
+    "PermissionGrantScope": {
+      "type": "string",
+      "enum": ["turn", "session"]
+    },
     "PermissionsRequestApprovalParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "PermissionsRequestApprovalParams",
@@ -2488,334 +2655,110 @@
         }
       }
     },
-    "ToolRequestUserInputOption": {
-      "description": "EXPERIMENTAL. Defines a single selectable option for request_user_input.",
+    "PermissionsRequestApprovalResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PermissionsRequestApprovalResponse",
       "type": "object",
-      "required": ["description", "label"],
+      "required": ["permissions"],
       "properties": {
-        "description": {
-          "type": "string"
+        "permissions": {
+          "$ref": "#/definitions/GrantedPermissionProfile"
         },
-        "label": {
-          "type": "string"
+        "scope": {
+          "default": "turn",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PermissionGrantScope"
+            }
+          ]
+        },
+        "strictAutoReview": {
+          "description": "Review every subsequent command in this turn before normal sandboxed execution.",
+          "type": ["boolean", "null"]
         }
       }
     },
-    "ToolRequestUserInputParams": {
+    "RequestId": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ToolRequestUserInputParams",
-      "description": "EXPERIMENTAL. Params sent with a request_user_input event.",
-      "type": "object",
-      "required": ["itemId", "questions", "threadId", "turnId"],
-      "properties": {
-        "itemId": {
+      "title": "RequestId",
+      "anyOf": [
+        {
           "type": "string"
         },
-        "questions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ToolRequestUserInputQuestion"
-          }
-        },
-        "threadId": {
-          "type": "string"
-        },
-        "turnId": {
-          "type": "string"
-        }
-      }
-    },
-    "ToolRequestUserInputQuestion": {
-      "description": "EXPERIMENTAL. Represents one request_user_input question and its required options.",
-      "type": "object",
-      "required": ["header", "id", "question"],
-      "properties": {
-        "header": {
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        },
-        "isOther": {
-          "default": false,
-          "type": "boolean"
-        },
-        "isSecret": {
-          "default": false,
-          "type": "boolean"
-        },
-        "options": {
-          "type": ["array", "null"],
-          "items": {
-            "$ref": "#/definitions/ToolRequestUserInputOption"
-          }
-        },
-        "question": {
-          "type": "string"
-        }
-      }
-    },
-    "ServerRequest": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ServerRequest",
-      "description": "Request initiated from the server and sent to the client.",
-      "oneOf": [
         {
-          "description": "NEW APIs Sent when approval is requested for a specific command execution. This request is used for Turns started via turn/start.",
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["item/commandExecution/requestApproval"],
-              "title": "Item/commandExecution/requestApprovalRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/CommandExecutionRequestApprovalParams"
-            }
-          },
-          "title": "Item/commandExecution/requestApprovalRequest"
-        },
-        {
-          "description": "Sent when approval is requested for a specific file change. This request is used for Turns started via turn/start.",
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["item/fileChange/requestApproval"],
-              "title": "Item/fileChange/requestApprovalRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/FileChangeRequestApprovalParams"
-            }
-          },
-          "title": "Item/fileChange/requestApprovalRequest"
-        },
-        {
-          "description": "EXPERIMENTAL - Request input from the user for a tool call.",
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["item/tool/requestUserInput"],
-              "title": "Item/tool/requestUserInputRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/ToolRequestUserInputParams"
-            }
-          },
-          "title": "Item/tool/requestUserInputRequest"
-        },
-        {
-          "description": "Request input for an MCP server elicitation.",
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["mcpServer/elicitation/request"],
-              "title": "McpServer/elicitation/requestRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/McpServerElicitationRequestParams"
-            }
-          },
-          "title": "McpServer/elicitation/requestRequest"
-        },
-        {
-          "description": "Request approval for additional permissions from the user.",
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["item/permissions/requestApproval"],
-              "title": "Item/permissions/requestApprovalRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/PermissionsRequestApprovalParams"
-            }
-          },
-          "title": "Item/permissions/requestApprovalRequest"
-        },
-        {
-          "description": "Execute a dynamic tool call on the client.",
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["item/tool/call"],
-              "title": "Item/tool/callRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/DynamicToolCallParams"
-            }
-          },
-          "title": "Item/tool/callRequest"
-        },
-        {
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["account/chatgptAuthTokens/refresh"],
-              "title": "Account/chatgptAuthTokens/refreshRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/ChatgptAuthTokensRefreshParams"
-            }
-          },
-          "title": "Account/chatgptAuthTokens/refreshRequest"
-        },
-        {
-          "description": "DEPRECATED APIs below Request to approve a patch. This request is used for Turns started via the legacy APIs (i.e. SendUserTurn, SendUserMessage).",
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["applyPatchApproval"],
-              "title": "ApplyPatchApprovalRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/ApplyPatchApprovalParams"
-            }
-          },
-          "title": "ApplyPatchApprovalRequest"
-        },
-        {
-          "description": "Request to exec a command. This request is used for Turns started via the legacy APIs (i.e. SendUserTurn, SendUserMessage).",
-          "type": "object",
-          "required": ["id", "method", "params"],
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "type": "string",
-              "enum": ["execCommandApproval"],
-              "title": "ExecCommandApprovalRequestMethod"
-            },
-            "params": {
-              "$ref": "#/definitions/ExecCommandApprovalParams"
-            }
-          },
-          "title": "ExecCommandApprovalRequest"
-        }
-      ]
-    },
-    "ClientNotification": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ClientNotification",
-      "oneOf": [
-        {
-          "type": "object",
-          "required": ["method"],
-          "properties": {
-            "method": {
-              "type": "string",
-              "enum": ["initialized"],
-              "title": "InitializedNotificationMethod"
-            }
-          },
-          "title": "InitializedNotification"
-        }
-      ]
-    },
-    "FuzzyFileSearchMatchType": {
-      "type": "string",
-      "enum": ["file", "directory"]
-    },
-    "FuzzyFileSearchResult": {
-      "description": "Superset of [`codex_file_search::FileMatch`]",
-      "type": "object",
-      "required": ["file_name", "match_type", "path", "root", "score"],
-      "properties": {
-        "file_name": {
-          "type": "string"
-        },
-        "indices": {
-          "type": ["array", "null"],
-          "items": {
-            "type": "integer",
-            "format": "uint32",
-            "minimum": 0.0
-          }
-        },
-        "match_type": {
-          "$ref": "#/definitions/FuzzyFileSearchMatchType"
-        },
-        "path": {
-          "type": "string"
-        },
-        "root": {
-          "type": "string"
-        },
-        "score": {
           "type": "integer",
-          "format": "uint32",
-          "minimum": 0.0
+          "format": "int64"
         }
-      }
+      ]
     },
-    "FuzzyFileSearchSessionCompletedNotification": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionCompletedNotification",
-      "type": "object",
-      "required": ["sessionId"],
-      "properties": {
-        "sessionId": {
-          "type": "string"
-        }
-      }
-    },
-    "FuzzyFileSearchSessionUpdatedNotification": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionUpdatedNotification",
-      "type": "object",
-      "required": ["files", "query", "sessionId"],
-      "properties": {
-        "files": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/FuzzyFileSearchResult"
-          }
+    "ReviewDecision": {
+      "description": "User's decision in response to an ExecApprovalRequest.",
+      "oneOf": [
+        {
+          "description": "User has approved this command and the agent should execute it.",
+          "type": "string",
+          "enum": ["approved"]
         },
-        "query": {
-          "type": "string"
+        {
+          "description": "User has approved this command and wants to apply the proposed execpolicy amendment so future matching commands are permitted.",
+          "type": "object",
+          "required": ["approved_execpolicy_amendment"],
+          "properties": {
+            "approved_execpolicy_amendment": {
+              "type": "object",
+              "required": ["proposed_execpolicy_amendment"],
+              "properties": {
+                "proposed_execpolicy_amendment": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false,
+          "title": "ApprovedExecpolicyAmendmentReviewDecision"
         },
-        "sessionId": {
-          "type": "string"
+        {
+          "description": "User has approved this request and wants future prompts in the same session-scoped approval cache to be automatically approved for the remainder of the session.",
+          "type": "string",
+          "enum": ["approved_for_session"]
+        },
+        {
+          "description": "User chose to persist a network policy rule (allow/deny) for future requests to the same host.",
+          "type": "object",
+          "required": ["network_policy_amendment"],
+          "properties": {
+            "network_policy_amendment": {
+              "type": "object",
+              "required": ["network_policy_amendment"],
+              "properties": {
+                "network_policy_amendment": {
+                  "$ref": "#/definitions/NetworkPolicyAmendment"
+                }
+              }
+            }
+          },
+          "additionalProperties": false,
+          "title": "NetworkPolicyAmendmentReviewDecision"
+        },
+        {
+          "description": "User has denied this command and the agent should not execute it, but it should continue the session and try something else.",
+          "type": "string",
+          "enum": ["denied"]
+        },
+        {
+          "description": "Automatic approval review timed out before reaching a decision.",
+          "type": "string",
+          "enum": ["timed_out"]
+        },
+        {
+          "description": "User has denied this command and the agent should not do anything until the user's next command.",
+          "type": "string",
+          "enum": ["abort"]
         }
-      }
+      ]
     },
     "ServerNotification": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -3699,6 +3642,278 @@
         }
       ]
     },
+    "ServerRequest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ServerRequest",
+      "description": "Request initiated from the server and sent to the client.",
+      "oneOf": [
+        {
+          "description": "NEW APIs Sent when approval is requested for a specific command execution. This request is used for Turns started via turn/start.",
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["item/commandExecution/requestApproval"],
+              "title": "Item/commandExecution/requestApprovalRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/CommandExecutionRequestApprovalParams"
+            }
+          },
+          "title": "Item/commandExecution/requestApprovalRequest"
+        },
+        {
+          "description": "Sent when approval is requested for a specific file change. This request is used for Turns started via turn/start.",
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["item/fileChange/requestApproval"],
+              "title": "Item/fileChange/requestApprovalRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/FileChangeRequestApprovalParams"
+            }
+          },
+          "title": "Item/fileChange/requestApprovalRequest"
+        },
+        {
+          "description": "EXPERIMENTAL - Request input from the user for a tool call.",
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["item/tool/requestUserInput"],
+              "title": "Item/tool/requestUserInputRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/ToolRequestUserInputParams"
+            }
+          },
+          "title": "Item/tool/requestUserInputRequest"
+        },
+        {
+          "description": "Request input for an MCP server elicitation.",
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["mcpServer/elicitation/request"],
+              "title": "McpServer/elicitation/requestRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/McpServerElicitationRequestParams"
+            }
+          },
+          "title": "McpServer/elicitation/requestRequest"
+        },
+        {
+          "description": "Request approval for additional permissions from the user.",
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["item/permissions/requestApproval"],
+              "title": "Item/permissions/requestApprovalRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/PermissionsRequestApprovalParams"
+            }
+          },
+          "title": "Item/permissions/requestApprovalRequest"
+        },
+        {
+          "description": "Execute a dynamic tool call on the client.",
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["item/tool/call"],
+              "title": "Item/tool/callRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/DynamicToolCallParams"
+            }
+          },
+          "title": "Item/tool/callRequest"
+        },
+        {
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["account/chatgptAuthTokens/refresh"],
+              "title": "Account/chatgptAuthTokens/refreshRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/ChatgptAuthTokensRefreshParams"
+            }
+          },
+          "title": "Account/chatgptAuthTokens/refreshRequest"
+        },
+        {
+          "description": "DEPRECATED APIs below Request to approve a patch. This request is used for Turns started via the legacy APIs (i.e. SendUserTurn, SendUserMessage).",
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["applyPatchApproval"],
+              "title": "ApplyPatchApprovalRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/ApplyPatchApprovalParams"
+            }
+          },
+          "title": "ApplyPatchApprovalRequest"
+        },
+        {
+          "description": "Request to exec a command. This request is used for Turns started via the legacy APIs (i.e. SendUserTurn, SendUserMessage).",
+          "type": "object",
+          "required": ["id", "method", "params"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["execCommandApproval"],
+              "title": "ExecCommandApprovalRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/ExecCommandApprovalParams"
+            }
+          },
+          "title": "ExecCommandApprovalRequest"
+        }
+      ]
+    },
+    "ToolRequestUserInputAnswer": {
+      "description": "EXPERIMENTAL. Captures a user's answer to a request_user_input question.",
+      "type": "object",
+      "required": ["answers"],
+      "properties": {
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ToolRequestUserInputOption": {
+      "description": "EXPERIMENTAL. Defines a single selectable option for request_user_input.",
+      "type": "object",
+      "required": ["description", "label"],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "ToolRequestUserInputParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ToolRequestUserInputParams",
+      "description": "EXPERIMENTAL. Params sent with a request_user_input event.",
+      "type": "object",
+      "required": ["itemId", "questions", "threadId", "turnId"],
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ToolRequestUserInputQuestion"
+          }
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "turnId": {
+          "type": "string"
+        }
+      }
+    },
+    "ToolRequestUserInputQuestion": {
+      "description": "EXPERIMENTAL. Represents one request_user_input question and its required options.",
+      "type": "object",
+      "required": ["header", "id", "question"],
+      "properties": {
+        "header": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "isOther": {
+          "default": false,
+          "type": "boolean"
+        },
+        "isSecret": {
+          "default": false,
+          "type": "boolean"
+        },
+        "options": {
+          "type": ["array", "null"],
+          "items": {
+            "$ref": "#/definitions/ToolRequestUserInputOption"
+          }
+        },
+        "question": {
+          "type": "string"
+        }
+      }
+    },
+    "ToolRequestUserInputResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ToolRequestUserInputResponse",
+      "description": "EXPERIMENTAL. Response payload mapping question ids to answers.",
+      "type": "object",
+      "required": ["answers"],
+      "properties": {
+        "answers": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ToolRequestUserInputAnswer"
+          }
+        }
+      }
+    },
     "v2": {
       "AbsolutePathBuf": {
         "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
@@ -3959,7 +4174,7 @@
           "globScanMaxDepth": {
             "type": ["integer", "null"],
             "format": "uint",
-            "minimum": 1.0
+            "minimum": 1
           }
         }
       },
@@ -4265,7 +4480,7 @@
               "timeout_ms": {
                 "type": ["integer", "null"],
                 "format": "uint64",
-                "minimum": 0.0
+                "minimum": 0
               },
               "type": {
                 "type": "string",
@@ -5080,7 +5295,7 @@
           "extraCount": {
             "type": "integer",
             "format": "uint",
-            "minimum": 0.0
+            "minimum": 0
           },
           "failedScan": {
             "type": "boolean"
@@ -5169,7 +5384,7 @@
             "description": "The number of turns to drop from the end of the thread. Must be >= 1.\n\nThis only modifies the thread's history and does not revert local file changes that have been made by the agent. Clients are responsible for reverting these changes.",
             "type": "integer",
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "threadId": {
             "type": "string"
@@ -5240,7 +5455,7 @@
             "description": "Optional page size; defaults to a reasonable server-side value.",
             "type": ["integer", "null"],
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "modelProviders": {
             "description": "Optional provider filter; when set, only sessions recorded under these providers are returned. When present but empty, includes all providers.",
@@ -5301,7 +5516,7 @@
             "description": "Optional page size; defaults to no limit.",
             "type": ["integer", "null"],
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       },
@@ -5335,7 +5550,7 @@
             "description": "Optional turn page size.",
             "type": ["integer", "null"],
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "sortDirection": {
             "description": "Optional turn pagination direction; defaults to descending.",
@@ -5497,7 +5712,7 @@
             "description": "Optional page size; defaults to a reasonable server-side value.",
             "type": ["integer", "null"],
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "threadId": {
             "description": "Optional thread id used to evaluate app feature gating from that thread's config.",
@@ -5949,12 +6164,12 @@
           "end": {
             "type": "integer",
             "format": "uint",
-            "minimum": 0.0
+            "minimum": 0
           },
           "start": {
             "type": "integer",
             "format": "uint",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       },
@@ -6535,17 +6750,17 @@
           "numChannels": {
             "type": "integer",
             "format": "uint16",
-            "minimum": 0.0
+            "minimum": 0
           },
           "sampleRate": {
             "type": "integer",
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "samplesPerChannel": {
             "type": ["integer", "null"],
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       },
@@ -6733,7 +6948,7 @@
             "description": "Optional page size; defaults to a reasonable server-side value.",
             "type": ["integer", "null"],
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       },
@@ -6750,7 +6965,7 @@
             "description": "Optional page size; defaults to a reasonable server-side value.",
             "type": ["integer", "null"],
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       },
@@ -6849,7 +7064,7 @@
             "description": "Optional page size; defaults to a server-defined value.",
             "type": ["integer", "null"],
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       },
@@ -7051,13 +7266,13 @@
             "description": "Terminal width in character cells.",
             "type": "integer",
             "format": "uint16",
-            "minimum": 0.0
+            "minimum": 0
           },
           "rows": {
             "description": "Terminal height in character cells.",
             "type": "integer",
             "format": "uint16",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       },
@@ -7098,7 +7313,7 @@
             "description": "Optional per-stream stdout/stderr capture cap in bytes.\n\nWhen omitted, the server default applies. Cannot be combined with `disableOutputCap`.",
             "type": ["integer", "null"],
             "format": "uint",
-            "minimum": 0.0
+            "minimum": 0
           },
           "permissionProfile": {
             "description": "Optional full permissions profile for this command.\n\nDefaults to the user's configured permissions when omitted. Cannot be combined with `sandboxPolicy`.",
@@ -7422,7 +7637,7 @@
                   "httpStatusCode": {
                     "type": ["integer", "null"],
                     "format": "uint16",
-                    "minimum": 0.0
+                    "minimum": 0
                   }
                 }
               }
@@ -7441,7 +7656,7 @@
                   "httpStatusCode": {
                     "type": ["integer", "null"],
                     "format": "uint16",
-                    "minimum": 0.0
+                    "minimum": 0
                   }
                 }
               }
@@ -7460,7 +7675,7 @@
                   "httpStatusCode": {
                     "type": ["integer", "null"],
                     "format": "uint16",
-                    "minimum": 0.0
+                    "minimum": 0
                   }
                 }
               }
@@ -7479,7 +7694,7 @@
                   "httpStatusCode": {
                     "type": ["integer", "null"],
                     "format": "uint16",
-                    "minimum": 0.0
+                    "minimum": 0
                   }
                 }
               }
@@ -7755,12 +7970,12 @@
           "lineEnd": {
             "type": "integer",
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "lineStart": {
             "type": "integer",
             "format": "uint32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "note": {
             "type": "string"
@@ -9099,13 +9314,13 @@
             "description": "1-based column number (in Unicode scalar values).",
             "type": "integer",
             "format": "uint",
-            "minimum": 0.0
+            "minimum": 0
           },
           "line": {
             "description": "1-based line number.",
             "type": "integer",
             "format": "uint",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       },
@@ -12033,7 +12248,7 @@
               "timeoutSec": {
                 "type": ["integer", "null"],
                 "format": "uint64",
-                "minimum": 0.0
+                "minimum": 0
               },
               "type": {
                 "type": "string",
@@ -12192,7 +12407,7 @@
           "httpPort": {
             "type": ["integer", "null"],
             "format": "uint16",
-            "minimum": 0.0
+            "minimum": 0
           },
           "managedAllowedDomainsOnly": {
             "description": "When true, only managed allowlist entries are respected while managed network enforcement is active.",
@@ -12201,7 +12416,7 @@
           "socksPort": {
             "type": ["integer", "null"],
             "format": "uint16",
-            "minimum": 0.0
+            "minimum": 0
           },
           "unixSockets": {
             "description": "Canonical unix socket permission map for `experimental_network`.",
@@ -12731,7 +12946,7 @@
           "globScanMaxDepth": {
             "type": ["integer", "null"],
             "format": "uint",
-            "minimum": 1.0
+            "minimum": 1
           },
           "read": {
             "description": "This will be removed in favor of `entries`.",
@@ -12871,7 +13086,7 @@
               "port": {
                 "type": "integer",
                 "format": "uint16",
-                "minimum": 0.0
+                "minimum": 0
               },
               "protocol": {
                 "$ref": "#/definitions/v2/NetworkApprovalProtocol"
@@ -13510,231 +13725,16 @@
         }
       }
     },
-    "AbsolutePathBuf": {
-      "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
-      "type": "string"
-    },
-    "InitializeResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "InitializeResponse",
+    "W3cTraceContext": {
       "type": "object",
-      "required": ["codexHome", "platformFamily", "platformOs", "userAgent"],
       "properties": {
-        "codexHome": {
-          "description": "Absolute path to the server's $CODEX_HOME directory.",
-          "allOf": [
-            {
-              "$ref": "#/definitions/v2/AbsolutePathBuf"
-            }
-          ]
+        "traceparent": {
+          "type": ["string", "null"]
         },
-        "platformFamily": {
-          "description": "Platform family for the running app-server target, for example `\"unix\"` or `\"windows\"`.",
-          "type": "string"
-        },
-        "platformOs": {
-          "description": "Operating system for the running app-server target, for example `\"macos\"`, `\"linux\"`, or `\"windows\"`.",
-          "type": "string"
-        },
-        "userAgent": {
-          "type": "string"
-        }
-      }
-    },
-    "FuzzyFileSearchResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchResponse",
-      "type": "object",
-      "required": ["files"],
-      "properties": {
-        "files": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/FuzzyFileSearchResult"
-          }
-        }
-      }
-    },
-    "ChatgptAuthTokensRefreshResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ChatgptAuthTokensRefreshResponse",
-      "type": "object",
-      "required": ["accessToken", "chatgptAccountId"],
-      "properties": {
-        "accessToken": {
-          "type": "string"
-        },
-        "chatgptAccountId": {
-          "type": "string"
-        },
-        "chatgptPlanType": {
+        "tracestate": {
           "type": ["string", "null"]
         }
       }
-    },
-    "DynamicToolCallResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "DynamicToolCallResponse",
-      "type": "object",
-      "required": ["contentItems", "success"],
-      "properties": {
-        "contentItems": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v2/DynamicToolCallOutputContentItem"
-          }
-        },
-        "success": {
-          "type": "boolean"
-        }
-      }
-    },
-    "PermissionsRequestApprovalResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "PermissionsRequestApprovalResponse",
-      "type": "object",
-      "required": ["permissions"],
-      "properties": {
-        "permissions": {
-          "$ref": "#/definitions/GrantedPermissionProfile"
-        },
-        "scope": {
-          "default": "turn",
-          "allOf": [
-            {
-              "$ref": "#/definitions/PermissionGrantScope"
-            }
-          ]
-        },
-        "strictAutoReview": {
-          "description": "Review every subsequent command in this turn before normal sandboxed execution.",
-          "type": ["boolean", "null"]
-        }
-      }
-    },
-    "CommandExecutionRequestApprovalResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "CommandExecutionRequestApprovalResponse",
-      "type": "object",
-      "required": ["decision"],
-      "properties": {
-        "decision": {
-          "$ref": "#/definitions/CommandExecutionApprovalDecision"
-        }
-      }
-    },
-    "FileChangeApprovalDecision": {
-      "oneOf": [
-        {
-          "description": "User approved the file changes.",
-          "type": "string",
-          "enum": ["accept"]
-        },
-        {
-          "description": "User approved the file changes and future changes to the same files should run without prompting.",
-          "type": "string",
-          "enum": ["acceptForSession"]
-        },
-        {
-          "description": "User denied the file changes. The agent will continue the turn.",
-          "type": "string",
-          "enum": ["decline"]
-        },
-        {
-          "description": "User denied the file changes. The turn will also be immediately interrupted.",
-          "type": "string",
-          "enum": ["cancel"]
-        }
-      ]
-    },
-    "FileChangeRequestApprovalResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FileChangeRequestApprovalResponse",
-      "type": "object",
-      "required": ["decision"],
-      "properties": {
-        "decision": {
-          "$ref": "#/definitions/FileChangeApprovalDecision"
-        }
-      }
-    },
-    "ToolRequestUserInputAnswer": {
-      "description": "EXPERIMENTAL. Captures a user's answer to a request_user_input question.",
-      "type": "object",
-      "required": ["answers"],
-      "properties": {
-        "answers": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "ToolRequestUserInputResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ToolRequestUserInputResponse",
-      "description": "EXPERIMENTAL. Response payload mapping question ids to answers.",
-      "type": "object",
-      "required": ["answers"],
-      "properties": {
-        "answers": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/ToolRequestUserInputAnswer"
-          }
-        }
-      }
-    },
-    "McpServerElicitationAction": {
-      "type": "string",
-      "enum": ["accept", "decline", "cancel"]
-    },
-    "McpServerElicitationRequestResponse": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "McpServerElicitationRequestResponse",
-      "type": "object",
-      "required": ["action"],
-      "properties": {
-        "_meta": {
-          "description": "Optional client metadata for form-mode action handling."
-        },
-        "action": {
-          "$ref": "#/definitions/McpServerElicitationAction"
-        },
-        "content": {
-          "description": "Structured user input for accepted elicitations, mirroring RMCP `CreateElicitationResult`.\n\nThis is nullable because decline/cancel responses have no content."
-        }
-      }
-    },
-    "GrantedPermissionProfile": {
-      "type": "object",
-      "properties": {
-        "fileSystem": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/v2/AdditionalFileSystemPermissions"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "network": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/v2/AdditionalNetworkPermissions"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
-    "PermissionGrantScope": {
-      "type": "string",
-      "enum": ["turn", "session"]
     }
   }
 }

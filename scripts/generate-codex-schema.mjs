@@ -10,6 +10,9 @@ await mkdir(outDir, { recursive: true });
 
 await run("codex", ["app-server", "generate-json-schema", "--out", outDir]);
 await run("npx", ["prettier", "--write", outDir]);
+await stabilizeSchemaBundle(join(outDir, "codex_app_server_protocol.schemas.json"));
+await stabilizeSchemaBundle(join(outDir, "codex_app_server_protocol.v2.schemas.json"));
+await run("npx", ["prettier", "--write", outDir]);
 const codexVersion = await capture("codex", ["--version"]);
 const schemaBundle = await readFile(join(outDir, "codex_app_server_protocol.v2.schemas.json"));
 const schemaSha256 = createHash("sha256").update(schemaBundle).digest("hex");
@@ -52,4 +55,18 @@ function capture(command, args) {
       }
     });
   });
+}
+
+async function stabilizeSchemaBundle(path) {
+  const schema = JSON.parse(await readFile(path, "utf8"));
+  if (schema && typeof schema === "object" && schema.definitions) {
+    schema.definitions = sortRecord(schema.definitions);
+  }
+  await writeFile(path, `${JSON.stringify(schema, null, 2)}\n`);
+}
+
+function sortRecord(value) {
+  return Object.fromEntries(
+    Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+  );
 }
