@@ -88,7 +88,7 @@ Every product envelope is signed before encryption:
 - bridge signs events, approval requests, status messages, and snapshots with the bridge Ed25519
   signing key.
 
-The signing input is RFC 8785-style canonical JSON. The signature is inside the encrypted payload,
+The signing input is RFC 8785 canonical JSON. The signature is inside the encrypted payload,
 so the relay cannot inspect or alter it. Receivers reject valid ciphertext with an invalid signature.
 
 ## AEAD, Nonce, And Replay Protection
