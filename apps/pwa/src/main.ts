@@ -1,4 +1,4 @@
-import { loadPairingState, parsePairingFragment, savePairingState } from "./state.js";
+import { loadPairingState, parsePairingFragment, savePendingPairing } from "./state.js";
 import "./styles.css";
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -11,11 +11,7 @@ const root = app;
 
 const fragment = parsePairingFragment(window.location.hash);
 if (fragment) {
-  savePairingState(window.localStorage, {
-    paired: true,
-    deviceId: `device-${crypto.randomUUID()}`,
-    roomId: fragment.roomId
-  });
+  savePendingPairing(window.localStorage, fragment);
   history.replaceState(null, "", "/");
 }
 
@@ -23,6 +19,22 @@ render();
 
 function render(): void {
   const state = loadPairingState(window.localStorage);
+  if (!state.paired && state.pending) {
+    root.innerHTML = `
+      <section class="shell">
+        <div class="panel">
+          <p class="eyebrow">Codex Remote Control</p>
+          <h1>Pairing pending</h1>
+          <p>Waiting for bridge proof before this device can open room <code>${escapeHtml(
+            state.pending.roomId
+          )}</code>.</p>
+          <p class="status">Pending verification</p>
+        </div>
+      </section>
+    `;
+    return;
+  }
+
   if (!state.paired) {
     root.innerHTML = `
       <section class="shell">
@@ -50,11 +62,7 @@ function render(): void {
         }
         return;
       }
-      savePairingState(window.localStorage, {
-        paired: true,
-        deviceId: `device-${crypto.randomUUID()}`,
-        roomId: parsed.roomId
-      });
+      savePendingPairing(window.localStorage, parsed);
       render();
     });
     return;

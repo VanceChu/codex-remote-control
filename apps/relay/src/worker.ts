@@ -2,7 +2,10 @@ import { RelayRoomState } from "./room-state.js";
 
 export interface Env {
   ROOM: DurableObjectNamespace;
+  CRC_DEV_WS_SECRET?: string;
 }
+
+export type WebSocketAuthResult = { ok: true } | { ok: false; status: 401 | 501; message: string };
 
 const roomName = "default";
 
@@ -13,6 +16,10 @@ export default {
       return Response.json({ ok: true });
     }
     if (url.pathname === "/ws/client" || url.pathname === "/ws/bridge") {
+      const auth = authorizeWebSocketRequest(request, env.CRC_DEV_WS_SECRET);
+      if (!auth.ok) {
+        return new Response(auth.message, { status: auth.status });
+      }
       const id = env.ROOM.idFromName(roomName);
       return env.ROOM.get(id).fetch(request);
     }
@@ -26,6 +33,19 @@ export default {
     });
   }
 };
+
+export function authorizeWebSocketRequest(
+  request: Request,
+  devSecret: string | undefined
+): WebSocketAuthResult {
+  if (!devSecret) {
+    return { ok: false, status: 501, message: "WebSocket auth is not configured" };
+  }
+  if (request.headers.get("x-crc-dev-secret") !== devSecret) {
+    return { ok: false, status: 401, message: "Invalid WebSocket credentials" };
+  }
+  return { ok: true };
+}
 
 export class RemoteControlRoom implements DurableObject {
   private readonly stateModel = new RelayRoomState();

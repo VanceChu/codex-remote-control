@@ -9,7 +9,13 @@ export interface JsonRpcRequest {
   params?: unknown;
 }
 
+export interface JsonRpcNotification {
+  method: string;
+  params?: unknown;
+}
+
 export type ServerRequestHandler = (request: JsonRpcRequest) => Promise<unknown> | unknown;
+export type NotificationHandler = (notification: JsonRpcNotification) => void;
 
 interface PendingRequest {
   resolve(value: unknown): void;
@@ -19,6 +25,7 @@ interface PendingRequest {
 export class JsonRpcPeer {
   private readonly pending = new Map<string | number, PendingRequest>();
   private serverRequestHandler?: ServerRequestHandler;
+  private notificationHandler?: NotificationHandler;
   private requestId = 0;
 
   constructor(private readonly transport: JsonlTransport) {
@@ -41,6 +48,10 @@ export class JsonRpcPeer {
     this.serverRequestHandler = handler;
   }
 
+  onNotification(handler: NotificationHandler): void {
+    this.notificationHandler = handler;
+  }
+
   private async handleLine(line: string): Promise<void> {
     const message = JSON.parse(line) as unknown;
     if (!isRecord(message)) {
@@ -52,6 +63,10 @@ export class JsonRpcPeer {
     }
     if (isJsonRpcRequest(message)) {
       await this.handleServerRequest(message);
+      return;
+    }
+    if (isJsonRpcNotification(message)) {
+      this.notificationHandler?.(message);
     }
   }
 
@@ -111,6 +126,13 @@ function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
     (typeof value.id === "string" || typeof value.id === "number") &&
     typeof value.method === "string"
   );
+}
+
+function isJsonRpcNotification(value: unknown): value is JsonRpcNotification {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return !("id" in value) && typeof value.method === "string";
 }
 
 function jsonRpcErrorToError(value: unknown): Error {

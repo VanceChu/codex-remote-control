@@ -15,20 +15,20 @@ export interface PairingTranscript {
   nonceB: string;
   nonceD: string;
   keyId: string;
-  epoch: number;
+  epoch: string;
 }
 
 export type Direction = "device_to_bridge" | "bridge_to_device";
 
 export interface AeadContext {
   roomId: string;
-  epoch: number;
+  epoch: string;
   senderId: string;
   direction: Direction;
   senderSeq: bigint;
   msgId: string;
-  chunkIdx: number;
-  totalChunks: number;
+  chunkIdx: string;
+  totalChunks: string;
   kind: string;
 }
 

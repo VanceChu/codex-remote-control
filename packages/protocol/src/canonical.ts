@@ -11,7 +11,7 @@ export function canonicalize(value: JsonValue): string {
     return value ? "true" : "false";
   }
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
+    if (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value))) {
       throw new TypeError("Unsupported JSON number");
     }
     return JSON.stringify(value);

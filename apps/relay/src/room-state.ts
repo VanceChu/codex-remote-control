@@ -40,8 +40,10 @@ export class RelayRoomState {
   }
 
   addDeviceMessage(deviceId: string, entry: RingBufferEntry): void {
+    const before = this.sumBytes(deviceId);
     this.bufferFor(deviceId).add(entry);
-    this.roomBytes += entry.bytes;
+    const after = this.sumBytes(deviceId);
+    this.roomBytes += after - before;
     this.evictAggregate();
   }
 

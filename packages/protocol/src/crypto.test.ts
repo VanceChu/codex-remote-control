@@ -29,7 +29,7 @@ describe("pairing proof", () => {
       nonceB: "nb",
       nonceD: "nd",
       keyId: "k1",
-      epoch: 1
+      epoch: "1"
     };
 
     const proof = computePairingProof(macKey, transcript);
@@ -83,13 +83,13 @@ describe("envelope signing", () => {
 describe("payload encryption", () => {
   const context: AeadContext = {
     roomId: "room-a",
-    epoch: 1,
+    epoch: "1",
     senderId: "device-a",
     direction: "device_to_bridge",
     senderSeq: 7n,
     msgId: "msg-a",
-    chunkIdx: 0,
-    totalChunks: 1,
+    chunkIdx: "0",
+    totalChunks: "1",
     kind: "turn.start"
   };
   const key = new Uint8Array(32).fill(7);
@@ -113,7 +113,7 @@ describe("payload encryption", () => {
 
   it("includes all routing fields in AAD", () => {
     expect(new TextDecoder().decode(buildAad(context))).toBe(
-      '{"chunkIdx":0,"direction":"device_to_bridge","epoch":1,"kind":"turn.start","msgId":"msg-a","roomId":"room-a","senderId":"device-a","senderSeq":"7","totalChunks":1}'
+      '{"chunkIdx":"0","direction":"device_to_bridge","epoch":"1","kind":"turn.start","msgId":"msg-a","roomId":"room-a","senderId":"device-a","senderSeq":"7","totalChunks":"1"}'
     );
   });
 });

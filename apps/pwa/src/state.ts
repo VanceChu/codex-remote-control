@@ -3,7 +3,9 @@ export interface PairingFragment {
   code: string;
 }
 
-export type PairingState = { paired: false } | { paired: true; deviceId: string; roomId: string };
+export type PairingState =
+  | { paired: false; pending?: { roomId: string } }
+  | { paired: true; deviceId: string; roomId: string };
 
 export type Screen = "pairing" | "workspace";
 
@@ -28,8 +30,19 @@ export function loadPairingState(storage: Pick<Storage, "getItem">): PairingStat
     return { paired: false };
   }
   try {
-    const value = JSON.parse(raw) as Partial<{ deviceId: string; roomId: string }>;
-    if (typeof value.deviceId === "string" && typeof value.roomId === "string") {
+    const value = JSON.parse(raw) as Partial<{
+      status: string;
+      deviceId: string;
+      roomId: string;
+    }>;
+    if (value.status === "pending" && typeof value.roomId === "string") {
+      return { paired: false, pending: { roomId: value.roomId } };
+    }
+    if (
+      value.status === "paired" &&
+      typeof value.deviceId === "string" &&
+      typeof value.roomId === "string"
+    ) {
       return { paired: true, deviceId: value.deviceId, roomId: value.roomId };
     }
   } catch {
@@ -44,6 +57,13 @@ export function savePairingState(
 ): void {
   storage.setItem(
     "crc.pairing",
-    JSON.stringify({ deviceId: state.deviceId, roomId: state.roomId })
+    JSON.stringify({ status: "paired", deviceId: state.deviceId, roomId: state.roomId })
   );
+}
+
+export function savePendingPairing(
+  storage: Pick<Storage, "setItem">,
+  fragment: PairingFragment
+): void {
+  storage.setItem("crc.pairing", JSON.stringify({ status: "pending", roomId: fragment.roomId }));
 }
