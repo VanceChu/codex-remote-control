@@ -23,4 +23,22 @@ describe("FileSequenceStore", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("serializes concurrent reservations for the same key", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "crc-sequence-"));
+    const file = join(dir, "seq.json");
+
+    try {
+      const store = new FileSequenceStore(file);
+      const reservations = await Promise.all([
+        reserveSequence(store, "device-a:uplink", 10),
+        reserveSequence(store, "device-a:uplink", 10)
+      ]);
+
+      expect(reservations.map((reservation) => reservation.start).sort()).toEqual([1n, 11n]);
+      expect(reservations.map((reservation) => reservation.end).sort()).toEqual([10n, 20n]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

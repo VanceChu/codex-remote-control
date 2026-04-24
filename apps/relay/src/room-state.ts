@@ -152,15 +152,23 @@ export class RelayRoomState {
     if (snapshot.bridgePublicKey) {
       this.bridgePublicKey = snapshot.bridgePublicKey;
     }
+    const now = Date.now();
     for (const item of snapshot.buffers) {
       const buffer = this.bufferFor(item.deviceId);
       for (const entry of item.entries) {
-        const before = this.sumBytes(item.deviceId);
         buffer.add(entry);
-        const after = this.sumBytes(item.deviceId);
-        this.roomBytes += after - before;
       }
+      buffer.evictExpired(now);
     }
+    this.roomBytes = this.sumAllBytes();
     this.evictAggregate();
+  }
+
+  private sumAllBytes(): number {
+    let total = 0;
+    for (const deviceId of this.buffers.keys()) {
+      total += this.sumBytes(deviceId);
+    }
+    return total;
   }
 }

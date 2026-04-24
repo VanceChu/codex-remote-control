@@ -16,6 +16,7 @@ export interface JsonRpcNotification {
 
 export type ServerRequestHandler = (request: JsonRpcRequest) => Promise<unknown> | unknown;
 export type NotificationHandler = (notification: JsonRpcNotification) => void;
+export type ErrorHandler = (error: Error) => void;
 
 interface PendingRequest {
   resolve(value: unknown): void;
@@ -26,11 +27,14 @@ export class JsonRpcPeer {
   private readonly pending = new Map<string | number, PendingRequest>();
   private serverRequestHandler?: ServerRequestHandler;
   private notificationHandler?: NotificationHandler;
+  private errorHandler?: ErrorHandler;
   private requestId = 0;
 
   constructor(private readonly transport: JsonlTransport) {
     this.transport.onLine((line) => {
-      void this.handleLine(line);
+      void this.handleLine(line).catch((error: unknown) => {
+        this.handlePeerError(errorToError(error));
+      });
     });
   }
 
@@ -52,8 +56,17 @@ export class JsonRpcPeer {
     this.notificationHandler = handler;
   }
 
+  onError(handler: ErrorHandler): void {
+    this.errorHandler = handler;
+  }
+
   private async handleLine(line: string): Promise<void> {
-    const message = JSON.parse(line) as unknown;
+    let message: unknown;
+    try {
+      message = JSON.parse(line) as unknown;
+    } catch (error) {
+      throw new Error(`Invalid JSON-RPC line: ${errorToError(error).message}`);
+    }
     if (!isRecord(message)) {
       return;
     }
@@ -108,6 +121,14 @@ export class JsonRpcPeer {
     this.transport.send(JSON.stringify({ id, error: { code, message } }));
   }
 
+  private handlePeerError(error: Error): void {
+    for (const pending of this.pending.values()) {
+      pending.reject(error);
+    }
+    this.pending.clear();
+    this.errorHandler?.(error);
+  }
+
   private nextRequestId(): number {
     this.requestId += 1;
     return this.requestId;
@@ -140,4 +161,8 @@ function jsonRpcErrorToError(value: unknown): Error {
     return new Error(value.message);
   }
   return new Error("JSON-RPC request failed");
+}
+
+function errorToError(value: unknown): Error {
+  return value instanceof Error ? value : new Error("JSON-RPC peer failed");
 }

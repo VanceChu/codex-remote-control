@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RelayRoomState } from "./room-state.js";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("RelayRoomState", () => {
   it("allows bridge registration exactly once", () => {
@@ -62,6 +66,34 @@ describe("RelayRoomState", () => {
 
     expect(room.deviceEntries("device-a").map((entry) => entry.msgId)).toEqual(["a-new"]);
     expect(room.deviceEntries("device-b").map((entry) => entry.msgId)).toEqual(["b"]);
+  });
+
+  it("evicts expired snapshot entries using the durable object wake time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(86_400_001);
+
+    const room = new RelayRoomState(
+      { perDeviceMaxBytes: 1_000, roomMaxBytes: 1_000 },
+      {
+        buffers: [
+          {
+            deviceId: "device-a",
+            entries: [
+              {
+                relaySeq: 1,
+                msgId: "expired",
+                chunkIdx: 0,
+                totalChunks: 1,
+                bytes: 100,
+                createdAt: 0
+              }
+            ]
+          }
+        ]
+      }
+    );
+
+    expect(room.deviceEntries("device-a")).toEqual([]);
   });
 
   it("rate-limits repeated failures by key", () => {

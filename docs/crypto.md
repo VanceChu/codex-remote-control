@@ -104,8 +104,11 @@ Nonce format:
 Each payload key has its own `sendSeq`. `senderId` is `deviceId`, not `tabId`. Multiple tabs from
 the same device share a counter through IndexedDB and `navigator.locks`.
 
-Both PWA and bridge must use write-ahead sequence reservation. A process reserves a range before
-using any value in that range. After a crash, unused values in the reserved range are skipped. If a
+Both PWA and bridge must use atomic write-ahead sequence reservation. A process reserves a range
+before using any value in that range, and the reservation backend must perform read-modify-write in
+one critical section. The PWA backend uses a single IndexedDB `readwrite` transaction and Web Locks
+when available; the bridge backend serializes reservations with an in-process per-key mutex before
+fsyncing the updated file. After a crash, unused values in the reserved range are skipped. If a
 process cannot prove a nonce was not reused, it must rotate the affected key and prefix before
 sending more messages.
 

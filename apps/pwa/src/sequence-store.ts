@@ -1,34 +1,65 @@
-import type { SequenceStore } from "@crc/protocol";
+import type { SequenceRange, SequenceStore } from "@crc/protocol";
 
 const storeName = "reservations";
+
+interface SequenceLockManager {
+  request<T>(name: string, callback: () => Promise<T>): Promise<T>;
+}
 
 export class IndexedDbSequenceStore implements SequenceStore {
   constructor(
     private readonly indexedDb: IDBFactory = globalThis.indexedDB,
-    private readonly dbName = "crc-sequence-v1"
+    private readonly dbName = "crc-sequence-v1",
+    private readonly lockManager: SequenceLockManager | undefined = defaultLockManager()
   ) {}
 
-  async readReserved(key: string): Promise<bigint> {
-    const db = await this.openDatabase();
-    try {
-      const tx = db.transaction(storeName, "readonly");
-      const value = await requestResult<string | undefined>(tx.objectStore(storeName).get(key));
-      await transactionDone(tx);
-      return typeof value === "string" ? BigInt(value) : 0n;
-    } finally {
-      db.close();
+  async reserveRange(key: string, size: bigint): Promise<SequenceRange> {
+    const reserve = () => this.reserveRangeInTransaction(key, size);
+    if (this.lockManager) {
+      return this.lockManager.request(`crc-sequence:${key}`, reserve);
     }
+    return reserve();
   }
 
-  async writeReserved(key: string, value: bigint): Promise<void> {
+  private async reserveRangeInTransaction(key: string, size: bigint): Promise<SequenceRange> {
     const db = await this.openDatabase();
-    try {
+    return new Promise((resolve, reject) => {
+      let range: SequenceRange | undefined;
       const tx = db.transaction(storeName, "readwrite");
-      tx.objectStore(storeName).put(value.toString(), key);
-      await transactionDone(tx);
-    } finally {
-      db.close();
-    }
+      const store = tx.objectStore(storeName);
+      const getRequest = store.get(key);
+
+      getRequest.onsuccess = () => {
+        try {
+          const previousEnd =
+            typeof getRequest.result === "string" ? BigInt(getRequest.result) : 0n;
+          const start = previousEnd + 1n;
+          const end = previousEnd + size;
+          range = { start, end };
+          store.put(end.toString(), key);
+        } catch (error) {
+          tx.abort();
+          reject(error);
+        }
+      };
+
+      tx.oncomplete = () => {
+        db.close();
+        if (!range) {
+          reject(new Error("Sequence reservation did not complete"));
+          return;
+        }
+        resolve(range);
+      };
+      tx.onabort = () => {
+        db.close();
+        reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error ?? new Error("IndexedDB transaction failed"));
+      };
+    });
   }
 
   private openDatabase(): Promise<IDBDatabase> {
@@ -47,27 +78,6 @@ export class IndexedDbSequenceStore implements SequenceStore {
   }
 }
 
-function requestResult<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-    request.onerror = () => {
-      reject(request.error ?? new Error("IndexedDB request failed"));
-    };
-  });
-}
-
-function transactionDone(tx: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => {
-      resolve();
-    };
-    tx.onabort = () => {
-      reject(tx.error ?? new Error("IndexedDB transaction aborted"));
-    };
-    tx.onerror = () => {
-      reject(tx.error ?? new Error("IndexedDB transaction failed"));
-    };
-  });
+function defaultLockManager(): SequenceLockManager | undefined {
+  return (globalThis.navigator as (Navigator & { locks?: SequenceLockManager }) | undefined)?.locks;
 }

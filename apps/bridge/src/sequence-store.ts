@@ -1,22 +1,39 @@
 import { mkdir, open, readFile, rename } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { SequenceStore } from "@crc/protocol";
+import type { SequenceRange, SequenceStore } from "@crc/protocol";
 
 type SequenceFile = Record<string, string>;
 
 export class FileSequenceStore implements SequenceStore {
+  private static readonly locks = new Map<string, Promise<void>>();
+
   constructor(private readonly filePath: string) {}
 
-  async readReserved(key: string): Promise<bigint> {
-    const data = await this.readFile();
-    const value = data[key];
-    return typeof value === "string" ? BigInt(value) : 0n;
+  async reserveRange(key: string, size: bigint): Promise<SequenceRange> {
+    return FileSequenceStore.withKeyLock(`${this.filePath}:${key}`, async () => {
+      const data = await this.readFile();
+      const previousEnd = typeof data[key] === "string" ? BigInt(data[key]) : 0n;
+      const start = previousEnd + 1n;
+      const end = previousEnd + size;
+      data[key] = end.toString();
+      await this.writeFile(data);
+      return { start, end };
+    });
   }
 
-  async writeReserved(key: string, value: bigint): Promise<void> {
-    const data = await this.readFile();
-    data[key] = value.toString();
-    await this.writeFile(data);
+  private static withKeyLock<T>(key: string, task: () => Promise<T>): Promise<T> {
+    const previous = FileSequenceStore.locks.get(key) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(task);
+    const next = run.then(
+      () => undefined,
+      () => undefined
+    );
+    FileSequenceStore.locks.set(key, next);
+    return run.finally(() => {
+      if (FileSequenceStore.locks.get(key) === next) {
+        FileSequenceStore.locks.delete(key);
+      }
+    });
   }
 
   private async readFile(): Promise<SequenceFile> {
@@ -38,7 +55,7 @@ export class FileSequenceStore implements SequenceStore {
 
   private async writeFile(data: SequenceFile): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.${randomSuffix()}.tmp`;
     const handle = await open(tempPath, "w");
     try {
       await handle.writeFile(`${JSON.stringify(data, null, 2)}\n`, "utf8");
@@ -59,9 +76,25 @@ async function fsyncDirectory(path: string): Promise<void> {
     } finally {
       await handle.close();
     }
-  } catch {
-    // Some filesystems do not allow directory fsync. The file itself was already fsynced.
+  } catch (error) {
+    if (isUnsupportedDirectoryFsync(error)) {
+      return;
+    }
+    throw error;
   }
+}
+
+function randomSuffix(): string {
+  return Math.random().toString(16).slice(2);
+}
+
+function isUnsupportedDirectoryFsync(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    ["EINVAL", "ENOTSUP", "EISDIR"].includes(String((error as { code?: unknown }).code))
+  );
 }
 
 function isMissingFile(error: unknown): boolean {
