@@ -1,0 +1,19 @@
+{
+  "name": "@crc/codex-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@crc/protocol": "0.1.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0"
+  }
+}

@@ -5,4 +5,5 @@ coverage/
 .dev.vars
 .DS_Store
 *.log
+*.tsbuildinfo
 .codex-remote-control/
