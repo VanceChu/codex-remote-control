@@ -33,6 +33,37 @@ describe("RelayRoomState", () => {
     expect(room.deviceEntries("device-b").map((entry) => entry.msgId)).toEqual(["b"]);
   });
 
+  it("does not over-evict aggregate buffers after per-device eviction", () => {
+    const room = new RelayRoomState({ perDeviceMaxBytes: 600, roomMaxBytes: 1_000 });
+    room.addDeviceMessage("device-a", {
+      relaySeq: 1,
+      msgId: "a-old",
+      chunkIdx: 0,
+      totalChunks: 1,
+      bytes: 600,
+      createdAt: 1
+    });
+    room.addDeviceMessage("device-b", {
+      relaySeq: 2,
+      msgId: "b",
+      chunkIdx: 0,
+      totalChunks: 1,
+      bytes: 380,
+      createdAt: 2
+    });
+    room.addDeviceMessage("device-a", {
+      relaySeq: 3,
+      msgId: "a-new",
+      chunkIdx: 0,
+      totalChunks: 1,
+      bytes: 600,
+      createdAt: 3
+    });
+
+    expect(room.deviceEntries("device-a").map((entry) => entry.msgId)).toEqual(["a-new"]);
+    expect(room.deviceEntries("device-b").map((entry) => entry.msgId)).toEqual(["b"]);
+  });
+
   it("rate-limits repeated failures by key", () => {
     const room = new RelayRoomState();
 

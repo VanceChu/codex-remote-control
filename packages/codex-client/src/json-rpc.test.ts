@@ -60,6 +60,23 @@ describe("JsonRpcPeer", () => {
     });
   });
 
+  it("dispatches app-server notifications without ids", () => {
+    const transport = new MemoryTransport();
+    const peer = new JsonRpcPeer(transport);
+    const seen: string[] = [];
+
+    peer.onNotification((notification) => {
+      seen.push(notification.method);
+    });
+
+    transport.receive({
+      method: "turn/started",
+      params: { threadId: "thread-a", turnId: "turn-a" }
+    });
+
+    expect(seen).toEqual(["turn/started"]);
+  });
+
   it("rejects invalid JSON-RPC error responses", async () => {
     const transport = new MemoryTransport();
     const peer = new JsonRpcPeer(transport);

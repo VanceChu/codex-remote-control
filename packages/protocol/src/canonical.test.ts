@@ -12,4 +12,8 @@ describe("canonicalize", () => {
     expect(() => canonicalize({ value: undefined })).toThrow("Unsupported JSON value");
     expect(() => canonicalize(Number.NaN)).toThrow("Unsupported JSON number");
   });
+
+  it("rejects unsafe JSON integers", () => {
+    expect(() => canonicalize(Number.MAX_SAFE_INTEGER + 1)).toThrow("Unsupported JSON number");
+  });
 });
