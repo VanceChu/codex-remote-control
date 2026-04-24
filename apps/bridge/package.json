@@ -1,0 +1,24 @@
+{
+  "name": "@crc/bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "crc": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run \"src/**/*.test.ts\"",
+    "start": "node dist/cli.js bridge start"
+  },
+  "dependencies": {
+    "@crc/codex-client": "0.1.0",
+    "@crc/protocol": "0.1.0",
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0"
+  }
+}
