@@ -1,34 +1,39 @@
+import { canonicalize as rfc8785Canonicalize } from "json-canonicalize";
 import type { JsonValue } from "./types.js";
 
 export function canonicalize(value: JsonValue): string {
+  validateJsonValue(value);
+  return rfc8785Canonicalize(value);
+}
+
+function validateJsonValue(value: JsonValue): void {
   if (value === null) {
-    return "null";
+    return;
   }
-  if (typeof value === "string") {
-    return JSON.stringify(value);
-  }
-  if (typeof value === "boolean") {
-    return value ? "true" : "false";
+  if (typeof value === "string" || typeof value === "boolean") {
+    return;
   }
   if (typeof value === "number") {
     if (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value))) {
       throw new TypeError("Unsupported JSON number");
     }
-    return JSON.stringify(value);
+    return;
   }
   if (Array.isArray(value)) {
-    return `[${value.map((item) => canonicalize(item)).join(",")}]`;
+    for (const item of value) {
+      validateJsonValue(item);
+    }
+    return;
   }
   if (typeof value === "object") {
-    const parts: string[] = [];
-    for (const key of Object.keys(value).sort()) {
+    for (const key of Object.keys(value)) {
       const item = value[key];
       if (item === undefined) {
         throw new TypeError("Unsupported JSON value");
       }
-      parts.push(`${JSON.stringify(key)}:${canonicalize(item)}`);
+      validateJsonValue(item);
     }
-    return `{${parts.join(",")}}`;
+    return;
   }
   throw new TypeError("Unsupported JSON value");
 }

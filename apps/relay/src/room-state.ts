@@ -10,13 +10,18 @@ export type RegisterBridgeResult =
   | { status: "already_registered" }
   | { status: "locked" };
 
+export interface RelayRoomSnapshot {
+  bridgePublicKey?: string;
+  buffers: Array<{ deviceId: string; entries: RingBufferEntry[] }>;
+}
+
 interface FailureWindow {
   count: number;
   firstSeen: number;
 }
 
 export class RelayRoomState {
-  private bridgePublicKey?: string;
+  private bridgePublicKey: string | undefined;
   private readonly buffers = new Map<string, DeviceRingBuffer>();
   private readonly failures = new Map<string, FailureWindow>();
   private roomBytes = 0;
@@ -25,8 +30,13 @@ export class RelayRoomState {
     private readonly limits: RelayRoomLimits = {
       perDeviceMaxBytes: 10_000_000,
       roomMaxBytes: 50_000_000
+    },
+    snapshot?: RelayRoomSnapshot
+  ) {
+    if (snapshot) {
+      this.restore(snapshot);
     }
-  ) {}
+  }
 
   registerBridge(bridgePublicKey: string): RegisterBridgeResult {
     if (!this.bridgePublicKey) {
@@ -49,6 +59,19 @@ export class RelayRoomState {
 
   deviceEntries(deviceId: string): RingBufferEntry[] {
     return this.bufferFor(deviceId).entries();
+  }
+
+  snapshot(): RelayRoomSnapshot {
+    const snapshot: RelayRoomSnapshot = {
+      buffers: [...this.buffers.entries()].map(([deviceId, buffer]) => ({
+        deviceId,
+        entries: buffer.entries()
+      }))
+    };
+    if (this.bridgePublicKey) {
+      snapshot.bridgePublicKey = this.bridgePublicKey;
+    }
+    return snapshot;
   }
 
   recordFailure(key: string, now: number): boolean {
@@ -123,5 +146,21 @@ export class RelayRoomState {
     return this.bufferFor(deviceId)
       .entries()
       .reduce((sum, entry) => sum + entry.bytes, 0);
+  }
+
+  private restore(snapshot: RelayRoomSnapshot): void {
+    if (snapshot.bridgePublicKey) {
+      this.bridgePublicKey = snapshot.bridgePublicKey;
+    }
+    for (const item of snapshot.buffers) {
+      const buffer = this.bufferFor(item.deviceId);
+      for (const entry of item.entries) {
+        const before = this.sumBytes(item.deviceId);
+        buffer.add(entry);
+        const after = this.sumBytes(item.deviceId);
+        this.roomBytes += after - before;
+      }
+    }
+    this.evictAggregate();
   }
 }

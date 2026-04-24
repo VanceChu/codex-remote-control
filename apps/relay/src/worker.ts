@@ -1,4 +1,4 @@
-import { RelayRoomState } from "./room-state.js";
+import { RelayRoomState, type RelayRoomSnapshot } from "./room-state.js";
 
 export interface Env {
   ROOM: DurableObjectNamespace;
@@ -8,6 +8,7 @@ export interface Env {
 export type WebSocketAuthResult = { ok: true } | { ok: false; status: 401 | 501; message: string };
 
 const roomName = "default";
+const roomStateStorageKey = "room-state-v1";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -48,7 +49,7 @@ export function authorizeWebSocketRequest(
 }
 
 export class RemoteControlRoom implements DurableObject {
-  private readonly stateModel = new RelayRoomState();
+  private stateModel?: RelayRoomState;
 
   constructor(private readonly state: DurableObjectState) {}
 
@@ -80,7 +81,24 @@ export class RemoteControlRoom implements DurableObject {
 
   async webSocketError(): Promise<void> {}
 
-  registerBridgeForTest(publicKey: string): ReturnType<RelayRoomState["registerBridge"]> {
-    return this.stateModel.registerBridge(publicKey);
+  async registerBridgeForTest(
+    publicKey: string
+  ): Promise<ReturnType<RelayRoomState["registerBridge"]>> {
+    const state = await this.roomState();
+    const result = state.registerBridge(publicKey);
+    await this.saveRoomState(state);
+    return result;
+  }
+
+  private async roomState(): Promise<RelayRoomState> {
+    if (!this.stateModel) {
+      const snapshot = await this.state.storage.get<RelayRoomSnapshot>(roomStateStorageKey);
+      this.stateModel = new RelayRoomState(undefined, snapshot);
+    }
+    return this.stateModel;
+  }
+
+  private async saveRoomState(state: RelayRoomState): Promise<void> {
+    await this.state.storage.put(roomStateStorageKey, state.snapshot());
   }
 }
