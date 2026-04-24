@@ -1,17 +1,21 @@
+export interface SequenceRange {
+  readonly start: bigint;
+  readonly end: bigint;
+}
+
 export interface SequenceStore {
-  readReserved(key: string): Promise<bigint>;
-  writeReserved(key: string, value: bigint): Promise<void>;
+  reserveRange(key: string, size: bigint): Promise<SequenceRange>;
 }
 
 export class InMemorySequenceStore implements SequenceStore {
   private readonly values = new Map<string, bigint>();
 
-  async readReserved(key: string): Promise<bigint> {
-    return this.values.get(key) ?? 0n;
-  }
-
-  async writeReserved(key: string, value: bigint): Promise<void> {
-    this.values.set(key, value);
+  async reserveRange(key: string, size: bigint): Promise<SequenceRange> {
+    const previousEnd = this.values.get(key) ?? 0n;
+    const start = previousEnd + 1n;
+    const end = previousEnd + size;
+    this.values.set(key, end);
+    return { start, end };
   }
 }
 
@@ -29,10 +33,7 @@ export async function reserveSequence(
   if (!Number.isSafeInteger(size) || size <= 0) {
     throw new RangeError("Reservation size must be a positive safe integer");
   }
-  const previousEnd = await store.readReserved(key);
-  const start = previousEnd + 1n;
-  const end = previousEnd + BigInt(size);
-  await store.writeReserved(key, end);
+  const { start, end } = await store.reserveRange(key, BigInt(size));
 
   let cursor = start;
   return {

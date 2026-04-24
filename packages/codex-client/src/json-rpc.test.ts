@@ -16,6 +16,10 @@ class MemoryTransport implements JsonlTransport {
   receive(value: unknown): void {
     this.handler?.(JSON.stringify(value));
   }
+
+  receiveLine(line: string): void {
+    this.handler?.(line);
+  }
 }
 
 describe("JsonRpcPeer", () => {
@@ -85,5 +89,22 @@ describe("JsonRpcPeer", () => {
     transport.receive({ id: 1, error: { code: -32000, message: "nope" } });
 
     await expect(promise).rejects.toThrow("nope");
+  });
+
+  it("contains malformed stdout lines and rejects pending requests", async () => {
+    const transport = new MemoryTransport();
+    const peer = new JsonRpcPeer(transport);
+    const errors: Error[] = [];
+
+    peer.onError((error) => {
+      errors.push(error);
+    });
+
+    const promise = peer.request("thread/list", {});
+    transport.receiveLine("{not json");
+
+    await expect(promise).rejects.toThrow("Invalid JSON-RPC line");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toContain("Invalid JSON-RPC line");
   });
 });

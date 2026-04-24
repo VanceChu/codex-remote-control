@@ -26,6 +26,10 @@ export class DeviceRingBuffer {
     return this.items.filter((entry) => entry.relaySeq > relaySeq);
   }
 
+  evictExpired(now: number): void {
+    this.evict(now);
+  }
+
   private evict(now: number): void {
     while (this.items.length > 0 && this.shouldEvict(now)) {
       const first = this.items[0]!;

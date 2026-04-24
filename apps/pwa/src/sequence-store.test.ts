@@ -19,4 +19,18 @@ describe("IndexedDbSequenceStore", () => {
     const afterCrash = await reserveSequence(restartedStore, "device-a:downlink", 10);
     expect(afterCrash.next()).toBe(11n);
   });
+
+  it("serializes concurrent reservations for the same key", async () => {
+    dbId += 1;
+    const dbName = `crc-sequence-test-${dbId}`;
+    const store = new IndexedDbSequenceStore(indexedDB, dbName);
+
+    const reservations = await Promise.all([
+      reserveSequence(store, "device-a:downlink", 10),
+      reserveSequence(store, "device-a:downlink", 10)
+    ]);
+
+    expect(reservations.map((reservation) => reservation.start).sort()).toEqual([1n, 11n]);
+    expect(reservations.map((reservation) => reservation.end).sort()).toEqual([10n, 20n]);
+  });
 });
