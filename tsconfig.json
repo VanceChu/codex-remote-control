@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/protocol" },
+    { "path": "./packages/codex-client" },
+    { "path": "./apps/bridge" },
+    { "path": "./apps/relay" },
+    { "path": "./apps/pwa" }
+  ]
+}
