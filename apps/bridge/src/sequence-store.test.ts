@@ -41,4 +41,27 @@ describe("FileSequenceStore", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("preserves every key when different keys reserve concurrently", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "crc-sequence-"));
+    const file = join(dir, "seq.json");
+
+    try {
+      const store = new FileSequenceStore(file);
+      const keys = Array.from({ length: 40 }, (_, index) => `device-${index}:uplink`);
+
+      await Promise.all(keys.map((key) => reserveSequence(store, key, 10)));
+
+      const restartedStore = new FileSequenceStore(file);
+      const afterRestart = await Promise.all(
+        keys.map((key) => reserveSequence(restartedStore, key, 10))
+      );
+
+      expect(afterRestart.map((reservation) => reservation.start)).toEqual(
+        Array.from({ length: keys.length }, () => 11n)
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

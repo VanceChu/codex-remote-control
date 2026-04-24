@@ -10,7 +10,7 @@ export class FileSequenceStore implements SequenceStore {
   constructor(private readonly filePath: string) {}
 
   async reserveRange(key: string, size: bigint): Promise<SequenceRange> {
-    return FileSequenceStore.withKeyLock(`${this.filePath}:${key}`, async () => {
+    return FileSequenceStore.withFileLock(this.filePath, async () => {
       const data = await this.readFile();
       const previousEnd = typeof data[key] === "string" ? BigInt(data[key]) : 0n;
       const start = previousEnd + 1n;
@@ -21,17 +21,17 @@ export class FileSequenceStore implements SequenceStore {
     });
   }
 
-  private static withKeyLock<T>(key: string, task: () => Promise<T>): Promise<T> {
-    const previous = FileSequenceStore.locks.get(key) ?? Promise.resolve();
+  private static withFileLock<T>(filePath: string, task: () => Promise<T>): Promise<T> {
+    const previous = FileSequenceStore.locks.get(filePath) ?? Promise.resolve();
     const run = previous.catch(() => undefined).then(task);
     const next = run.then(
       () => undefined,
       () => undefined
     );
-    FileSequenceStore.locks.set(key, next);
+    FileSequenceStore.locks.set(filePath, next);
     return run.finally(() => {
-      if (FileSequenceStore.locks.get(key) === next) {
-        FileSequenceStore.locks.delete(key);
+      if (FileSequenceStore.locks.get(filePath) === next) {
+        FileSequenceStore.locks.delete(filePath);
       }
     });
   }
