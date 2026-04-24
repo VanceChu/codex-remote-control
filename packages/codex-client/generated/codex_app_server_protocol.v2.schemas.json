@@ -9848,17 +9848,22 @@
       "type": "string",
       "enum": ["file", "directory"]
     },
-    "ClientInfo": {
+    "FuzzyFileSearchSessionUpdatedNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchSessionUpdatedNotification",
       "type": "object",
-      "required": ["name", "version"],
+      "required": ["files", "query", "sessionId"],
       "properties": {
-        "name": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FuzzyFileSearchResult"
+          }
+        },
+        "query": {
           "type": "string"
         },
-        "title": {
-          "type": ["string", "null"]
-        },
-        "version": {
+        "sessionId": {
           "type": "string"
         }
       }
@@ -9894,6 +9899,24 @@
         }
       }
     },
+    "InitializeCapabilities": {
+      "description": "Client-declared capabilities negotiated during initialize.",
+      "type": "object",
+      "properties": {
+        "experimentalApi": {
+          "description": "Opt into receiving experimental API methods and fields.",
+          "default": false,
+          "type": "boolean"
+        },
+        "optOutNotificationMethods": {
+          "description": "Exact notification method names that should be suppressed for this connection (for example `thread/started`).",
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "InitializeParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "InitializeParams",
@@ -9915,41 +9938,18 @@
         }
       }
     },
-    "FuzzyFileSearchSessionUpdatedNotification": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionUpdatedNotification",
+    "ClientInfo": {
       "type": "object",
-      "required": ["files", "query", "sessionId"],
+      "required": ["name", "version"],
       "properties": {
-        "files": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/FuzzyFileSearchResult"
-          }
-        },
-        "query": {
+        "name": {
           "type": "string"
         },
-        "sessionId": {
-          "type": "string"
-        }
-      }
-    },
-    "InitializeCapabilities": {
-      "description": "Client-declared capabilities negotiated during initialize.",
-      "type": "object",
-      "properties": {
-        "experimentalApi": {
-          "description": "Opt into receiving experimental API methods and fields.",
-          "default": false,
-          "type": "boolean"
+        "title": {
+          "type": ["string", "null"]
         },
-        "optOutNotificationMethods": {
-          "description": "Exact notification method names that should be suppressed for this connection (for example `thread/started`).",
-          "type": ["array", "null"],
-          "items": {
-            "type": "string"
-          }
+        "version": {
+          "type": "string"
         }
       }
     },
