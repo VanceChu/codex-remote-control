@@ -53,7 +53,8 @@ describe("nextScreen", () => {
         paired: true,
         deviceId: "device-a",
         roomId: "room-a",
-        deviceToken: "token-a"
+        deviceToken: "token-a",
+        relayOrigin: "https://relay.example"
       })
     ).toBe("workspace");
   });
@@ -66,10 +67,17 @@ describe("nextScreen", () => {
           storage.set(key, value);
         }
       },
-      { paired: true, roomId: "room-a", deviceId: "device-a", deviceToken: "token-a" }
+      {
+        paired: true,
+        roomId: "room-a",
+        deviceId: "device-a",
+        deviceToken: "token-a",
+        relayOrigin: "https://relay.example"
+      }
     );
 
     expect(storage.get("crc.pairing")).toContain("token-a");
+    expect(storage.get("crc.pairing")).toContain("https://relay.example");
     expect(storage.get("crc.pairing")).not.toContain("pair-code-a");
   });
 });

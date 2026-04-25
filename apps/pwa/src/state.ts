@@ -5,7 +5,7 @@ export interface PairingFragment {
 
 export type PairingState =
   | { paired: false; pending?: { roomId: string } }
-  | { paired: true; deviceId: string; roomId: string; deviceToken: string };
+  | { paired: true; deviceId: string; roomId: string; deviceToken: string; relayOrigin: string };
 
 export type Screen = "pairing" | "workspace";
 
@@ -35,6 +35,7 @@ export function loadPairingState(storage: Pick<Storage, "getItem">): PairingStat
       deviceId: string;
       roomId: string;
       deviceToken: string;
+      relayOrigin: string;
     }>;
     if (value.status === "pending" && typeof value.roomId === "string") {
       return { paired: false, pending: { roomId: value.roomId } };
@@ -43,13 +44,15 @@ export function loadPairingState(storage: Pick<Storage, "getItem">): PairingStat
       value.status === "paired" &&
       typeof value.deviceId === "string" &&
       typeof value.roomId === "string" &&
-      typeof value.deviceToken === "string"
+      typeof value.deviceToken === "string" &&
+      typeof value.relayOrigin === "string"
     ) {
       return {
         paired: true,
         deviceId: value.deviceId,
         roomId: value.roomId,
-        deviceToken: value.deviceToken
+        deviceToken: value.deviceToken,
+        relayOrigin: value.relayOrigin
       };
     }
   } catch {
@@ -68,7 +71,8 @@ export function savePairingState(
       status: "paired",
       deviceId: state.deviceId,
       roomId: state.roomId,
-      deviceToken: state.deviceToken
+      deviceToken: state.deviceToken,
+      relayOrigin: state.relayOrigin
     })
   );
 }

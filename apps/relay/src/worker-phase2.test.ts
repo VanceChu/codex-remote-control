@@ -138,7 +138,7 @@ describe("RemoteControlRoom phase 2 HTTP pairing", () => {
     expect(badRoom.status).toBe(401);
     await expect(badRoom.json()).resolves.toEqual({ error: "invalid" });
 
-    for (let attempt = 0; attempt < 4; attempt += 1) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       await room.fetch(
         new Request("https://relay.example/api/pair/claim", {
           method: "POST",
@@ -154,6 +154,45 @@ describe("RemoteControlRoom phase 2 HTTP pairing", () => {
     );
     expect(limited.status).toBe(429);
     await expect(limited.json()).resolves.toEqual({ error: "rate_limited" });
+  });
+
+  it("does not let bad claims for one device globally lock a valid claim", async () => {
+    const room = new RemoteControlRoom(durableState(new MemoryStorage()), env());
+    const createResponse = await room.fetch(
+      new Request("https://relay.example/api/pair/create", { method: "POST" })
+    );
+    const created = PairCreateResponseSchema.parse(await createResponse.json());
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await room.fetch(
+        new Request("https://relay.example/api/pair/claim", {
+          method: "POST",
+          body: JSON.stringify({
+            roomId: phase2RoomId,
+            code: "bad-code",
+            deviceId: "attacker-device"
+          }),
+          headers: { "CF-Connecting-IP": "203.0.113.10" }
+        })
+      );
+    }
+
+    const valid = await room.fetch(
+      new Request("https://relay.example/api/pair/claim", {
+        method: "POST",
+        body: JSON.stringify({
+          roomId: phase2RoomId,
+          code: created.code,
+          deviceId: "legit-device"
+        }),
+        headers: { "CF-Connecting-IP": "203.0.113.20" }
+      })
+    );
+
+    expect(valid.status).toBe(200);
+    expect(PairClaimResponseSchema.parse(await valid.json())).toMatchObject({
+      deviceId: "legit-device"
+    });
   });
 });
 

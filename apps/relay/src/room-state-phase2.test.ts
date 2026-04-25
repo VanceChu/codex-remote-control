@@ -102,4 +102,24 @@ describe("RelayRoomState phase 2 pairing", () => {
     const restored = new RelayRoomState(undefined, state.snapshot());
     expect(restored.verifyDeviceToken("device-a", claimed.deviceToken)).toBe(true);
   });
+
+  it("expires claimed pairing records from restored snapshots", () => {
+    const state = new RelayRoomState();
+    const created = state.createPairing("https://relay.example", 1_000);
+    const claimed = state.claimPairing({
+      roomId: phase2RoomId,
+      code: created.code,
+      deviceId: "device-a",
+      now: 2_000
+    });
+    if (claimed.status !== "claimed") {
+      throw new Error("expected claimed result");
+    }
+
+    vi.spyOn(Date, "now").mockReturnValue(created.expiresAt + 1);
+    const restored = new RelayRoomState(undefined, state.snapshot());
+
+    expect(restored.snapshot().pairings).toHaveLength(0);
+    expect(restored.verifyDeviceToken("device-a", claimed.deviceToken)).toBe(true);
+  });
 });

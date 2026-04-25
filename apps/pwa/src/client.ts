@@ -72,3 +72,7 @@ export function clientPingMessage(pingId: string): string {
 export function parseRelayMessage(text: string): Phase2Message {
   return parsePhase2MessageText(text);
 }
+
+export function isClientAuthCloseFailure(authAccepted: boolean, closeCode: number): boolean {
+  return !authAccepted && closeCode === 1008;
+}

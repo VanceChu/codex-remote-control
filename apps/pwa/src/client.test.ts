@@ -3,7 +3,8 @@ import {
   claimPairing,
   clientAuthMessage,
   clientPingMessage,
-  clientWebSocketUrl
+  clientWebSocketUrl,
+  isClientAuthCloseFailure
 } from "./client.js";
 
 describe("claimPairing", () => {
@@ -45,7 +46,8 @@ describe("client websocket helpers", () => {
         paired: true,
         roomId: "default",
         deviceId: "device-a",
-        deviceToken: "token-a"
+        deviceToken: "token-a",
+        relayOrigin: "https://relay.example"
       })
     );
     expect(auth).toMatchObject({
@@ -57,5 +59,11 @@ describe("client websocket helpers", () => {
       type: "client.ping",
       payload: { pingId: "ping-a" }
     });
+  });
+
+  it("detects auth failure closes before presence is received", () => {
+    expect(isClientAuthCloseFailure(false, 1008)).toBe(true);
+    expect(isClientAuthCloseFailure(true, 1008)).toBe(false);
+    expect(isClientAuthCloseFailure(false, 1000)).toBe(false);
   });
 });

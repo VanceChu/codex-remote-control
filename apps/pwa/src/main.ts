@@ -3,15 +3,16 @@ import {
   clientAuthMessage,
   clientPingMessage,
   clientWebSocketUrl,
+  isClientAuthCloseFailure,
   parseRelayMessage
 } from "./client.js";
+import { parsePairingTarget, type PairingTarget } from "./pairing-target.js";
 import {
   clearPairingState,
   loadOrCreateDeviceId,
   loadPairingState,
   parsePairingFragment,
   savePairingState,
-  type PairingFragment,
   type PairingState
 } from "./state.js";
 import "./styles.css";
@@ -32,7 +33,7 @@ let pingLog: string[] = [];
 
 const fragment = parsePairingFragment(window.location.hash);
 if (fragment) {
-  void claimAndClearFragment(fragment);
+  void claimAndClearFragment({ relayOrigin: window.location.origin, fragment });
 }
 
 render();
@@ -96,28 +97,29 @@ function renderPairingScreen(): void {
   `;
   document.querySelector<HTMLButtonElement>("#pair-button")?.addEventListener("click", () => {
     const value = document.querySelector<HTMLInputElement>("#pair-url")?.value ?? "";
-    const parsedUrl = safeUrl(value);
-    const parsed = parsedUrl ? parsePairingFragment(parsedUrl.hash) : undefined;
-    if (!parsed) {
+    const target = parsePairingTarget(value, window.location.origin);
+    if (!target) {
       claimStatus = { loading: false, error: "Invalid pairing URL." };
       render();
       return;
     }
-    void claimAndClearFragment(parsed);
+    void claimAndClearFragment(target);
   });
 }
 
-async function claimAndClearFragment(fragment: PairingFragment): Promise<void> {
+async function claimAndClearFragment(input: PairingTarget): Promise<void> {
+  const { relayOrigin, fragment } = input;
   claimStatus = { loading: true, roomId: fragment.roomId };
   render();
   try {
     const deviceId = loadOrCreateDeviceId(window.localStorage);
-    const claimed = await claimPairing(window.location.origin, fragment, deviceId);
+    const claimed = await claimPairing(relayOrigin, fragment, deviceId);
     savePairingState(window.localStorage, {
       paired: true,
       roomId: claimed.roomId,
       deviceId: claimed.deviceId,
-      deviceToken: claimed.deviceToken
+      deviceToken: claimed.deviceToken,
+      relayOrigin
     });
     claimStatus = { loading: false };
   } catch (error) {
@@ -146,8 +148,9 @@ function ensureClientSocket(state: Extract<PairingState, { paired: true }>): voi
   clientSocket?.close();
   clientSocketKey = key;
   wsState = "connecting";
-  const ws = new WebSocket(clientWebSocketUrl(window.location.origin));
+  const ws = new WebSocket(clientWebSocketUrl(state.relayOrigin));
   clientSocket = ws;
+  let authAccepted = false;
   ws.addEventListener("open", () => {
     wsState = "open";
     ws.send(clientAuthMessage(state));
@@ -161,6 +164,7 @@ function ensureClientSocket(state: Extract<PairingState, { paired: true }>): voi
     try {
       const message = parseRelayMessage(event.data);
       if (message.type === "presence.update") {
+        authAccepted = true;
         bridgeOnline = message.payload.bridgeOnline;
         pushLog(`presence bridge=${bridgeOnline ? "online" : "offline"}`);
       }
@@ -175,8 +179,21 @@ function ensureClientSocket(state: Extract<PairingState, { paired: true }>): voi
     }
     render();
   });
-  ws.addEventListener("close", () => {
+  ws.addEventListener("close", (event) => {
     if (clientSocket === ws) {
+      if (isClientAuthCloseFailure(authAccepted, event.code)) {
+        clearPairingState(window.localStorage);
+        clientSocket = undefined;
+        clientSocketKey = undefined;
+        claimStatus = {
+          loading: false,
+          error: "WebSocket authentication failed. Please pair this device again."
+        };
+        wsState = "closed";
+        bridgeOnline = false;
+        render();
+        return;
+      }
       wsState = "closed";
       bridgeOnline = false;
       render();
@@ -211,14 +228,6 @@ function pairingStatusText(): string {
     return `Claiming room ${claimStatus.roomId ?? ""}`;
   }
   return "Waiting for pairing URL";
-}
-
-function safeUrl(value: string): URL | undefined {
-  try {
-    return new URL(value);
-  } catch {
-    return undefined;
-  }
 }
 
 function escapeHtml(value: string): string {

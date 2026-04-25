@@ -170,13 +170,15 @@ export class RemoteControlRoom implements DurableObject {
       } catch {
         return Response.json({ error: "invalid_json" }, { status: 400 });
       }
+      const source = requestSourceKey(request);
       const parsed = PairClaimRequestSchema.safeParse(input);
       if (!parsed.success) {
-        state.recordFailure("pair-claim:invalid", Date.now());
+        state.recordFailure(`pair-claim:invalid:${source}`, Date.now());
         return Response.json({ error: "invalid_pair_claim" }, { status: 400 });
       }
       const now = Date.now();
-      if (state.isRateLimited("pair-claim", now)) {
+      const rateLimitKey = pairClaimRateLimitKey(source, parsed.data.roomId, parsed.data.deviceId);
+      if (state.isRateLimited(rateLimitKey, now)) {
         return Response.json({ error: "rate_limited" }, { status: 429 });
       }
       const result = state.claimPairing(
@@ -190,7 +192,7 @@ export class RemoteControlRoom implements DurableObject {
             }
       );
       if (result.status !== "claimed") {
-        state.recordFailure("pair-claim", now);
+        state.recordFailure(rateLimitKey, now);
       }
       await this.saveRoomState(state);
       return claimPairingResponse(result);
@@ -445,4 +447,17 @@ function claimPairingResponse(result: ClaimPairingResult): Response {
   }
   const status = result.status === "expired" ? 410 : 401;
   return Response.json({ error: result.status }, { status });
+}
+
+function requestSourceKey(request: Request): string {
+  const cfIp = request.headers.get("CF-Connecting-IP")?.trim();
+  if (cfIp) {
+    return cfIp;
+  }
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || "unknown";
+}
+
+function pairClaimRateLimitKey(source: string, roomId: string, deviceId: string): string {
+  return `pair-claim:${source}:${roomId}:${deviceId}`;
 }

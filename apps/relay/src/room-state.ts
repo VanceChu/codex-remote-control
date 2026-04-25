@@ -291,7 +291,7 @@ export class RelayRoomState {
   }
 
   private pruneExpiredPairings(now: number): void {
-    const kept = this.pairings.filter((pairing) => pairing.expiresAt > now || pairing.claimed);
+    const kept = this.pairings.filter((pairing) => pairing.expiresAt > now);
     this.pairings.length = 0;
     this.pairings.push(...kept);
   }
