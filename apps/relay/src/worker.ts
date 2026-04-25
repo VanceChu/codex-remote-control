@@ -1,11 +1,17 @@
 import { RelayRoomState, type RelayRoomSnapshot } from "./room-state.js";
+import { runNoiseIkKnownAnswerTest } from "@crc/protocol";
 
 export interface Env {
+  ASSETS?: Fetcher;
   ROOM: DurableObjectNamespace;
+  CRC_ENABLE_SELF_TEST?: string;
   CRC_DEV_WS_SECRET?: string;
 }
 
 export type WebSocketAuthResult = { ok: true } | { ok: false; status: 401 | 501; message: string };
+export type SelfTestAuthResult =
+  | { ok: true }
+  | { ok: false; status: 401 | 404 | 501; message: string };
 
 const roomName = "default";
 const roomStateStorageKey = "room-state-v1";
@@ -15,6 +21,9 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/health") {
       return Response.json({ ok: true });
+    }
+    if (url.pathname === "/__crc/self-test/noise-kat") {
+      return handleNoiseKatSelfTest(request, env);
     }
     if (url.pathname === "/ws/client" || url.pathname === "/ws/bridge") {
       const auth = authorizeWebSocketRequest(request, env.CRC_DEV_WS_SECRET);
@@ -29,11 +38,42 @@ export default {
         headers: { "content-type": "text/plain; charset=utf-8" }
       });
     }
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
     return new Response("Codex Remote Control relay", {
       headers: { "content-type": "text/plain; charset=utf-8" }
     });
   }
 };
+
+export function authorizeSelfTestRequest(request: Request, env: Env): SelfTestAuthResult {
+  if (env.CRC_ENABLE_SELF_TEST !== "1") {
+    return { ok: false, status: 404, message: "Not found" };
+  }
+  if (!env.CRC_DEV_WS_SECRET) {
+    return { ok: false, status: 501, message: "Self-test auth is not configured" };
+  }
+  if (request.headers.get("x-crc-dev-secret") !== env.CRC_DEV_WS_SECRET) {
+    return { ok: false, status: 401, message: "Invalid self-test credentials" };
+  }
+  return { ok: true };
+}
+
+export function handleNoiseKatSelfTest(request: Request, env: Env): Response {
+  const auth = authorizeSelfTestRequest(request, env);
+  if (!auth.ok) {
+    return new Response(auth.message, { status: auth.status });
+  }
+  const result = runNoiseIkKnownAnswerTest();
+  return Response.json({
+    ok: result.ok,
+    fixtureId: result.fixtureId,
+    protocolName: result.protocolName,
+    handshakeHash: result.handshakeHash,
+    failures: result.failures
+  });
+}
 
 export function authorizeWebSocketRequest(
   request: Request,
