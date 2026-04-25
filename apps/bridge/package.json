@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run \"src/**/*.test.ts\"",
+    "test": "vitest run",
     "start": "node dist/cli.js bridge start"
   },
   "dependencies": {
