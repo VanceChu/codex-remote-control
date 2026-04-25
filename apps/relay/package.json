@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run \"src/**/*.test.ts\"",
+    "test": "vitest run",
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "npm run build --workspace @crc/pwa && wrangler deploy"
   },
   "dependencies": {
     "@crc/protocol": "0.1.0",
