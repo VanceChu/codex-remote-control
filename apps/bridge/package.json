@@ -16,9 +16,11 @@
     "@crc/protocol": "0.1.0",
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
+    "qrcode-terminal": "^0.12.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@types/node": "^25.0.0"
+    "@types/node": "^25.0.0",
+    "@types/qrcode-terminal": "^0.12.2"
   }
 }
