@@ -18,19 +18,19 @@ Implemented in this slice:
   idempotency cache, and a deterministic `Noise_IK_25519_ChaChaPoly_SHA256` KAT harness.
 - `@crc/codex-client` with Codex App Server slash-method whitelist, unsupported server-request
   matrix, and a JSON-RPC peer.
-- `@crc/bridge` scaffold with approval arbitration, device registry, pairing URL generation, and
-  `crc bridge doctor/pair/start` plus `crc relay doctor`.
-- `@crc/relay` scaffold with Durable Object hibernatable WebSocket entrypoint, one-time bridge
-  registration state, rate limiting, per-device buffer logic, Worker-first static assets config, and
-  a gated Noise KAT self-test route.
-- `@crc/pwa` scaffold with unpaired pairing screen, paired workspace shell, and browser runtime Noise
-  KAT.
+- `@crc/bridge` scaffold with approval arbitration, device registry, file-backed sequence storage,
+  `crc relay doctor`, and Phase 2 relay pairing / WebSocket ping-pong runtime.
+- `@crc/relay` with Durable Object hibernatable WebSocket entrypoint, one-time bridge registration
+  state, Phase 2 pairing code claim, first-frame bridge/client auth, presence, ping-pong routing,
+  rate limiting, per-device buffer logic, Worker-first static assets config, and a gated Noise KAT
+  self-test route.
+- `@crc/pwa` with unpaired pairing screen, fragment/paste claim, paired workspace ping button, and
+  browser runtime Noise KAT.
 
 Not yet complete in this slice:
 
-- Real bridge-to-relay WebSocket connection.
-- Real phone pairing claim or ping/pong routing.
 - Real `codex app-server` lifecycle and stream fanout.
+- E2EE payload key issue and encrypted business envelopes.
 - Web Push delivery.
 - Cloudflare deployment verification against a live account.
 
@@ -51,7 +51,8 @@ Run the bridge CLI after building:
 npm run build --workspace @crc/bridge
 node apps/bridge/dist/cli.js bridge doctor
 node apps/bridge/dist/cli.js relay doctor
-node apps/bridge/dist/cli.js bridge pair https://example.workers.dev
+CRC_DEV_WS_SECRET=dev-secret node apps/bridge/dist/cli.js bridge pair https://example.workers.dev
+CRC_DEV_WS_SECRET=dev-secret node apps/bridge/dist/cli.js bridge start --relay https://example.workers.dev
 ```
 
 Run the PWA locally:
@@ -63,8 +64,20 @@ npm run dev --workspace @crc/pwa
 Run the relay locally:
 
 ```bash
-npm run dev --workspace @crc/relay
+npm run dev --workspace @crc/relay -- --var CRC_DEV_WS_SECRET:dev-secret
 ```
+
+Run the Phase 2 local pairing demo after building:
+
+```bash
+npm run build
+npm run dev --workspace @crc/relay -- --var CRC_DEV_WS_SECRET:dev-secret
+CRC_DEV_WS_SECRET=dev-secret node apps/bridge/dist/cli.js bridge pair http://127.0.0.1:8787
+CRC_DEV_WS_SECRET=dev-secret node apps/bridge/dist/cli.js bridge start --relay http://127.0.0.1:8787
+```
+
+Open the printed `/pair#room=default&code=...` URL from the relay origin. The PWA should claim the
+code, show `Bridge online`, and return a pong when `Send ping` is pressed.
 
 Run the Phase 1 browser Noise KAT:
 
@@ -89,10 +102,10 @@ Wrangler can authenticate:
 npm run deploy --workspace @crc/relay
 ```
 
-Stage 1 still does not implement pairing. `crc bridge start` remains a scaffold, and the relay
-continues to fail closed for WebSockets unless `CRC_DEV_WS_SECRET` is configured. Static assets are
-served by Cloudflare's asset layer unless the path is whitelisted in `run_worker_first`, so regular
-PWA resources do not consume Worker request budget.
+Phase 2 implements provisional pairing and ping-pong only. It still does not connect Codex, issue
+Noise payload keys, stream turns, replay missed timeline events, or send push notifications. Static
+assets are served by Cloudflare's asset layer unless the path is whitelisted in `run_worker_first`,
+so regular PWA resources do not consume Worker request budget.
 
 The relay self-test route `/__crc/self-test/noise-kat` is disabled by default with a runtime
 environment flag, not removed from the production bundle. Leave `CRC_ENABLE_SELF_TEST` unset in

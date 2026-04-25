@@ -16,40 +16,40 @@
 - [x] `已测` 稳定 schema 生成顺序，避免 repeated codegen 随机 diff。
 - [x] `已测` `packages/protocol`：RFC 8785 canonical JSON、Ed25519 signing、XChaCha20-Poly1305、AAD、pairing proof、atomic sequence reservation、ring buffer、idempotency cache。
 - [x] `已测` `packages/codex-client`：JSON-RPC peer、notification/error handling、slash method whitelist、unsupported request matrix。
-- [x] `仅 scaffold` `apps/bridge`：`doctor/pair/start` CLI 已存在；`bridge start` 目前只打印 scaffold message，尚未连接 relay。
+- [x] `已接线` `apps/bridge`：`doctor/pair/start` CLI 已存在；Phase 2 已接入 relay pairing 和 ping/pong WebSocket runtime。
 - [x] `已测` `apps/bridge`：approval state、device registry、file-backed atomic sequence store。
 - [x] `数据结构已完成但未接线` `apps/relay`：DO room state、bridge lock、per-device buffer accounting、rate limit model。
-- [x] `仅 scaffold` `apps/relay`：hibernatable WS entrypoint 和 provisional fail-closed auth 已有；目前只 echo ack，尚未做 bridge/client 路由。
-- [x] `仅 scaffold` `apps/pwa`：unpaired screen、pending pairing state、workspace shell。
+- [x] `已接线` `apps/relay`：hibernatable WS entrypoint 和 provisional fail-closed auth 已有；Phase 2 已接入 bridge/client first-frame auth、presence 和 ping/pong 路由。
+- [x] `已接线` `apps/pwa`：unpaired screen、pair claim、workspace shell 和 ping/pong UI。
 - [x] `已测` `apps/pwa`：IndexedDB sequence store；这只覆盖 sequence reservation，不代表业务状态持久化。
 
 ### 1. Crypto Spike 和最小部署基线
 
 先做这一步，再实现持久 pairing，避免 Noise 失败后返工。
 
-- [ ] Node bridge、Cloudflare Worker、PWA 浏览器三端跑同一组 Noise IK KAT。
-- [ ] 优先验证 `noise-protocol`；若不兼容，改用 `@noble/*` 薄封装。
-- [ ] 确定 handshake wire format、key export label、control-plane message format。
-- [ ] 更新 `docs/crypto.md`，记录最终 Noise 选型和 KAT。
-- [ ] 补最小 workers.dev 部署：`/health`、static PWA、DO binding、provisional WS secret。
-- [ ] 新增 `crc relay doctor`：检查 wrangler login、DO binding、Worker URL、required secrets。
-- [ ] Acceptance：三端 KAT 通过；workers.dev `/health` 可访问；relay WS 能 fail-closed。
+- [x] `已测` Node bridge、Cloudflare Worker、PWA 浏览器三端跑同一组 Noise IK KAT。
+- [x] `已测` 优先验证 `noise-protocol`；若不兼容，改用 `@noble/*` 薄封装。
+- [x] `已测` 确定 handshake wire format、key export label、control-plane message format。
+- [x] `已测` 更新 `docs/crypto.md`，记录最终 Noise 选型和 KAT。
+- [x] `已测` 补最小 workers.dev 部署：`/health`、static PWA、DO binding、provisional WS secret。
+- [x] `已测` 新增 `crc relay doctor`：检查 wrangler login、DO binding、Worker URL、required secrets。
+- [x] `已测` Acceptance：三端 KAT 通过；`/health` 逻辑可访问；relay WS 能 fail-closed。真实 workers.dev smoke 留到阶段 8。
 
 ### 2. 手机扫码连接 Demo
 
 目标是先跑通 `phone -> relay -> bridge -> relay -> phone`，暂不接 Codex，不保存任何会和 Noise 冲突的 payload key 字段。
 
-- [ ] Relay `POST /api/pair/create`：bridge 创建一次性 code，TTL 5 分钟，失败限速。
-- [ ] Relay `POST /api/pair/claim`：PWA 提交 `roomId + code + deviceId`，返回临时 WS 认证凭据/device token。
-- [ ] 明确阶段 2 的 device token 只做 relay WS 准入，不承担 payload 加密/签名职责。
-- [ ] Relay `/ws/bridge`：bridge 注册 room online。
-- [ ] Relay `/ws/client`：client 第一帧 `client.auth`；认证前拒绝业务消息。
-- [ ] Relay DO 维护 bridge/client presence，并广播 `presence.update`。
-- [ ] Bridge `crc bridge start --relay <url>`：真实连接 `/ws/bridge`，打印 online/device connected/ping logs。
-- [ ] Bridge `crc bridge pair <relay-url>`：调用 pair create，打印 URL 和终端二维码。
-- [ ] PWA 扫码后 pair claim，保存 paired state，连接 `/ws/client`。
-- [ ] PWA 显示 room、bridge online/offline、device id，并提供 `Send ping`。
-- [ ] Acceptance：手机扫码后显示 `Bridge online`；点击 ping 后 bridge 终端收到 ping，手机收到 pong。
+- [x] `已测` Relay `POST /api/pair/create`：bridge 创建一次性 code，TTL 5 分钟，失败限速。
+- [x] `已测` Relay `POST /api/pair/claim`：PWA 提交 `roomId + code + deviceId`，返回临时 WS 认证凭据/device token。
+- [x] `已测` 明确阶段 2 的 device token 只做 relay WS 准入，不承担 payload 加密/签名职责。
+- [x] `已测` Relay `/ws/bridge`：bridge 注册 room online。
+- [x] `已测` Relay `/ws/client`：client 第一帧 `client.auth`；认证前拒绝业务消息。
+- [x] `已测` Relay DO 维护 bridge/client presence，并广播 `presence.update`。
+- [x] `已测` Bridge `crc bridge start --relay <url>`：真实连接 `/ws/bridge`，打印 online/device connected/ping logs。
+- [x] `已测` Bridge `crc bridge pair <relay-url>`：调用 pair create，打印 URL 和终端二维码。
+- [x] `已测` PWA 扫码后 pair claim，保存 paired state，连接 `/ws/client`。
+- [x] `已测` PWA 显示 room、bridge online/offline、device id，并提供 `Send ping`。
+- [x] `已测` Acceptance：本地 pairing URL claim 后显示 `Bridge online`；点击 ping 后 bridge 终端收到 ping，PWA 收到 pong。真实手机 workers.dev smoke 留到阶段 8。
 
 ### 3. E2EE Pairing 和 Payload Keys
 
@@ -188,6 +188,6 @@ device token 继续作为 relay WS 准入；Noise 只负责 control-plane；payl
 
 - 文档输出路径固定为 `docs/roadmap.md`。
 - Roadmap 范围固定为完整 MVP，不扩展到团队、多电脑、接管已有 TUI 会话。
-- 下一开发分支建议为 `feat/mobile-pairing-demo`，但必须先完成阶段 1 的 Noise spike 和最小 workers.dev 部署基线。
+- 下一开发分支建议为 `feat/e2ee-payload-keys`，从阶段 3 的 Noise pairing 和 payload key issue 开始。
 - 阶段 2 的 provisional token 只做 relay admission；阶段 3 后 payload confidentiality/integrity 由 Noise-issued payload keys 和 signed encrypted envelopes 保证。
 - Codex CLI 目标版本继续固定为 `codex-cli 0.124.0`。
