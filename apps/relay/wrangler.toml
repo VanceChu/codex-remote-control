@@ -5,7 +5,7 @@ compatibility_date = "2026-04-24"
 [assets]
 directory = "../pwa/dist"
 binding = "ASSETS"
-run_worker_first = true
+run_worker_first = ["/health", "/__crc/*", "/ws/*", "/api/*", "/pair"]
 not_found_handling = "single-page-application"
 
 [[durable_objects.bindings]]

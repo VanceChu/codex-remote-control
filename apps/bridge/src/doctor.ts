@@ -70,7 +70,12 @@ export async function runRelayDoctor(startDir = process.cwd()): Promise<RelayDoc
       configText.includes("[assets]") &&
       configText.includes('directory = "../pwa/dist"') &&
       configText.includes('binding = "ASSETS"') &&
-      configText.includes("run_worker_first = true") &&
+      configText.includes("run_worker_first = [") &&
+      configText.includes('"/health"') &&
+      configText.includes('"/__crc/*"') &&
+      configText.includes('"/ws/*"') &&
+      configText.includes('"/api/*"') &&
+      configText.includes('"/pair"') &&
       configText.includes('not_found_handling = "single-page-application"');
   } catch {
     errors.push(`relay wrangler.toml not found at ${relayConfigPath}`);

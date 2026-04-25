@@ -2,7 +2,6 @@ import { RelayRoomState, type RelayRoomSnapshot } from "./room-state.js";
 import { runNoiseIkKnownAnswerTest } from "@crc/protocol";
 
 export interface Env {
-  ASSETS?: Fetcher;
   ROOM: DurableObjectNamespace;
   CRC_ENABLE_SELF_TEST?: string;
   CRC_DEV_WS_SECRET?: string;
@@ -37,9 +36,6 @@ export default {
       return new Response("Open the Codex Remote Control PWA to complete pairing.", {
         headers: { "content-type": "text/plain; charset=utf-8" }
       });
-    }
-    if (env.ASSETS) {
-      return env.ASSETS.fetch(request);
     }
     return new Response("Codex Remote Control relay", {
       headers: { "content-type": "text/plain; charset=utf-8" }

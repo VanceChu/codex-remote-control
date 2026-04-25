@@ -90,9 +90,13 @@ npm run deploy --workspace @crc/relay
 ```
 
 Stage 1 still does not implement pairing. `crc bridge start` remains a scaffold, and the relay
-continues to fail closed for WebSockets unless `CRC_DEV_WS_SECRET` is configured. The relay self-test
-route `/__crc/self-test/noise-kat` is disabled by default; set `CRC_ENABLE_SELF_TEST=1` and provide
-the provisional secret to run it in a non-production environment.
+continues to fail closed for WebSockets unless `CRC_DEV_WS_SECRET` is configured. Static assets are
+served by Cloudflare's asset layer unless the path is whitelisted in `run_worker_first`, so regular
+PWA resources do not consume Worker request budget.
+
+The relay self-test route `/__crc/self-test/noise-kat` is disabled by default with a runtime
+environment flag, not removed from the production bundle. Leave `CRC_ENABLE_SELF_TEST` unset in
+production; set it to `1` only with the provisional secret in a non-production environment.
 
 ## Security Model
 
