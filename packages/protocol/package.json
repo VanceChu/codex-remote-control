@@ -7,7 +7,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run \"src/**/*.test.ts\""
+    "test": "vitest run"
   },
   "dependencies": {
     "@noble/ciphers": "^2.2.0",
