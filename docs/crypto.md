@@ -59,6 +59,37 @@ Noise sessions are control-plane sessions. They authenticate pairing, reconnect,
 revoke messages. Business payloads are encrypted with long-term per-device payload keys so ring
 buffer replay works across reconnects.
 
+### Phase 1 Noise Spike Result
+
+The `noise-protocol` npm package was rejected for this MVP because its documented implementation is
+limited to `Noise_*_25519_ChaChaPoly_BLAKE2b`, while this contract requires
+`Noise_IK_25519_ChaChaPoly_SHA256`.
+
+The active implementation is a narrow `@noble/*` adapter:
+
+- `@noble/curves` for X25519.
+- `@noble/ciphers` for Noise `ChaChaPoly`.
+- `@noble/hashes` for SHA-256, HMAC, and HKDF.
+
+The deterministic KAT fixture fixes initiator/responder static keypairs, initiator/responder
+ephemeral keypairs, prologue, protocol name, and handshake payloads. KAT inputs live in
+`packages/protocol/src/noise-kat.fixture.ts`; Node, Worker, and browser tests import the same
+fixture. Production handshakes must use CSPRNG-generated ephemeral keys.
+
+Noise `ChaChaPoly` is the Noise spec cipher suite and uses a 96-bit nonce formed from 32 zero bits
+plus the 64-bit little-endian Noise nonce. This is intentionally separate from business payload
+XChaCha20-Poly1305, which remains defined in the payload-key section below.
+
+The Phase 1 control-plane KAT only proves opaque byte encryption/decryption and associated-data
+binding over the split Noise transport state. It does not define Stage 3 business message schemas
+such as payload-key issue, revoke, or epoch rotate.
+
+The Phase 1 export label is:
+
+```text
+crc/noise-ik/export/control-plane/v1
+```
+
 ## Payload Keys
 
 Each paired device has two payload keys:

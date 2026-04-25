@@ -15,19 +15,21 @@ Implemented in this slice:
 - `docs/crypto.md` with the v5 crypto contract.
 - `@crc/protocol` for canonical JSON, pairing proof, Ed25519 envelope signing,
   XChaCha20-Poly1305 payload encryption, write-ahead sequence reservation, atomic chunk ring buffer,
-  and idempotency cache.
+  idempotency cache, and a deterministic `Noise_IK_25519_ChaChaPoly_SHA256` KAT harness.
 - `@crc/codex-client` with Codex App Server slash-method whitelist, unsupported server-request
   matrix, and a JSON-RPC peer.
 - `@crc/bridge` scaffold with approval arbitration, device registry, pairing URL generation, and
-  `crc bridge doctor/pair/start`.
+  `crc bridge doctor/pair/start` plus `crc relay doctor`.
 - `@crc/relay` scaffold with Durable Object hibernatable WebSocket entrypoint, one-time bridge
-  registration state, rate limiting, and per-device buffer logic.
-- `@crc/pwa` scaffold with unpaired pairing screen and paired workspace shell.
+  registration state, rate limiting, per-device buffer logic, Worker-first static assets config, and
+  a gated Noise KAT self-test route.
+- `@crc/pwa` scaffold with unpaired pairing screen, paired workspace shell, and browser runtime Noise
+  KAT.
 
 Not yet complete in this slice:
 
-- Real Noise IK runtime implementation and KAT spike.
 - Real bridge-to-relay WebSocket connection.
+- Real phone pairing claim or ping/pong routing.
 - Real `codex app-server` lifecycle and stream fanout.
 - Web Push delivery.
 - Cloudflare deployment verification against a live account.
@@ -37,6 +39,7 @@ Not yet complete in this slice:
 ```bash
 npm install
 npm test
+npm run test:browser --workspace @crc/pwa
 npm run check
 npm run build
 npm run generate:codex-schema
@@ -47,6 +50,7 @@ Run the bridge CLI after building:
 ```bash
 npm run build --workspace @crc/bridge
 node apps/bridge/dist/cli.js bridge doctor
+node apps/bridge/dist/cli.js relay doctor
 node apps/bridge/dist/cli.js bridge pair https://example.workers.dev
 ```
 
@@ -61,6 +65,34 @@ Run the relay locally:
 ```bash
 npm run dev --workspace @crc/relay
 ```
+
+Run the Phase 1 browser Noise KAT:
+
+```bash
+npx playwright install chromium
+npm run test:browser --workspace @crc/pwa
+```
+
+Deploy the current workers.dev baseline:
+
+```bash
+CLOUDFLARE_API_TOKEN=... npm run deploy --workspace @crc/relay
+```
+
+Wrangler may require `CLOUDFLARE_API_TOKEN` in non-interactive environments even when
+`wrangler whoami` succeeds locally.
+
+Run the deploy script without setting extra environment if you are in an interactive terminal that
+Wrangler can authenticate:
+
+```bash
+npm run deploy --workspace @crc/relay
+```
+
+Stage 1 still does not implement pairing. `crc bridge start` remains a scaffold, and the relay
+continues to fail closed for WebSockets unless `CRC_DEV_WS_SECRET` is configured. The relay self-test
+route `/__crc/self-test/noise-kat` is disabled by default; set `CRC_ENABLE_SELF_TEST=1` and provide
+the provisional secret to run it in a non-production environment.
 
 ## Security Model
 
