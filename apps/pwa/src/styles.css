@@ -92,6 +92,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .error {
   min-height: 1.2em;
   color: #b42318;
@@ -119,6 +124,22 @@ button {
   border-radius: 999px;
   padding: 4px 10px;
   color: #126e82;
+}
+
+.status-stack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.muted,
+.status-line {
+  color: #5d6b78;
+}
+
+.muted-status {
+  color: #5d6b78;
 }
 
 .composer {

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { loadPairingState, nextScreen, parsePairingFragment, savePendingPairing } from "./state.js";
+import {
+  loadOrCreateDeviceId,
+  loadPairingState,
+  nextScreen,
+  parsePairingFragment,
+  savePairingState,
+  savePendingPairing
+} from "./state.js";
 
 describe("parsePairingFragment", () => {
   it("reads room and code from hash fragment", () => {
@@ -41,6 +48,56 @@ describe("nextScreen", () => {
   });
 
   it("shows workspace once paired", () => {
-    expect(nextScreen({ paired: true, deviceId: "device-a", roomId: "room-a" })).toBe("workspace");
+    expect(
+      nextScreen({
+        paired: true,
+        deviceId: "device-a",
+        roomId: "room-a",
+        deviceToken: "token-a",
+        relayOrigin: "https://relay.example"
+      })
+    ).toBe("workspace");
+  });
+
+  it("stores device token but never stores pairing code", () => {
+    const storage = new Map<string, string>();
+    savePairingState(
+      {
+        setItem(key, value) {
+          storage.set(key, value);
+        }
+      },
+      {
+        paired: true,
+        roomId: "room-a",
+        deviceId: "device-a",
+        deviceToken: "token-a",
+        relayOrigin: "https://relay.example"
+      }
+    );
+
+    expect(storage.get("crc.pairing")).toContain("token-a");
+    expect(storage.get("crc.pairing")).toContain("https://relay.example");
+    expect(storage.get("crc.pairing")).not.toContain("pair-code-a");
+  });
+});
+
+describe("loadOrCreateDeviceId", () => {
+  it("persists a generated device id", () => {
+    const storage = new Map<string, string>();
+    const adapter = {
+      getItem(key: string) {
+        return storage.get(key) ?? null;
+      },
+      setItem(key: string, value: string) {
+        storage.set(key, value);
+      }
+    };
+
+    const first = loadOrCreateDeviceId(adapter);
+    const second = loadOrCreateDeviceId(adapter);
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^device-/);
   });
 });

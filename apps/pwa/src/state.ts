@@ -5,7 +5,7 @@ export interface PairingFragment {
 
 export type PairingState =
   | { paired: false; pending?: { roomId: string } }
-  | { paired: true; deviceId: string; roomId: string };
+  | { paired: true; deviceId: string; roomId: string; deviceToken: string; relayOrigin: string };
 
 export type Screen = "pairing" | "workspace";
 
@@ -34,6 +34,8 @@ export function loadPairingState(storage: Pick<Storage, "getItem">): PairingStat
       status: string;
       deviceId: string;
       roomId: string;
+      deviceToken: string;
+      relayOrigin: string;
     }>;
     if (value.status === "pending" && typeof value.roomId === "string") {
       return { paired: false, pending: { roomId: value.roomId } };
@@ -41,9 +43,17 @@ export function loadPairingState(storage: Pick<Storage, "getItem">): PairingStat
     if (
       value.status === "paired" &&
       typeof value.deviceId === "string" &&
-      typeof value.roomId === "string"
+      typeof value.roomId === "string" &&
+      typeof value.deviceToken === "string" &&
+      typeof value.relayOrigin === "string"
     ) {
-      return { paired: true, deviceId: value.deviceId, roomId: value.roomId };
+      return {
+        paired: true,
+        deviceId: value.deviceId,
+        roomId: value.roomId,
+        deviceToken: value.deviceToken,
+        relayOrigin: value.relayOrigin
+      };
     }
   } catch {
     return { paired: false };
@@ -57,7 +67,13 @@ export function savePairingState(
 ): void {
   storage.setItem(
     "crc.pairing",
-    JSON.stringify({ status: "paired", deviceId: state.deviceId, roomId: state.roomId })
+    JSON.stringify({
+      status: "paired",
+      deviceId: state.deviceId,
+      roomId: state.roomId,
+      deviceToken: state.deviceToken,
+      relayOrigin: state.relayOrigin
+    })
   );
 }
 
@@ -66,4 +82,25 @@ export function savePendingPairing(
   fragment: PairingFragment
 ): void {
   storage.setItem("crc.pairing", JSON.stringify({ status: "pending", roomId: fragment.roomId }));
+}
+
+export function loadOrCreateDeviceId(storage: Pick<Storage, "getItem" | "setItem">): string {
+  const existing = storage.getItem("crc.deviceId");
+  if (existing) {
+    return existing;
+  }
+  const deviceId = createDeviceId();
+  storage.setItem("crc.deviceId", deviceId);
+  return deviceId;
+}
+
+export function clearPairingState(storage: Pick<Storage, "removeItem">): void {
+  storage.removeItem("crc.pairing");
+}
+
+function createDeviceId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `device-${crypto.randomUUID()}`;
+  }
+  return `device-${Math.random().toString(36).slice(2)}`;
 }

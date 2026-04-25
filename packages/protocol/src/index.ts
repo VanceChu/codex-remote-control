@@ -3,6 +3,7 @@ export * from "./crypto.js";
 export * from "./idempotency.js";
 export * from "./noise.js";
 export * from "./noise-kat.fixture.js";
+export * from "./phase2.js";
 export * from "./ring-buffer.js";
 export * from "./sequence.js";
 export * from "./types.js";
