@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 import { createPairingCode, createPairingUrl } from "./pairing.js";
-import { runBridgeDoctor } from "./doctor.js";
+import { runBridgeDoctor, runRelayDoctor } from "./doctor.js";
 
 async function main(argv: string[]): Promise<number> {
   const [scope, action, extra] = argv;
   if (scope === "bridge" && action === "doctor") {
     const result = await runBridgeDoctor();
+    console.log(JSON.stringify(result, null, 2));
+    return result.ok ? 0 : 1;
+  }
+  if (scope === "relay" && action === "doctor") {
+    const result = await runRelayDoctor();
     console.log(JSON.stringify(result, null, 2));
     return result.ok ? 0 : 1;
   }
@@ -22,7 +27,7 @@ async function main(argv: string[]): Promise<number> {
     );
     return 0;
   }
-  console.error("Usage: crc bridge <doctor|pair|start>");
+  console.error("Usage: crc bridge <doctor|pair|start> | crc relay doctor");
   return 2;
 }
 
