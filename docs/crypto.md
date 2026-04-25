@@ -76,13 +76,29 @@ ephemeral keypairs, prologue, protocol name, and handshake payloads. KAT inputs 
 `packages/protocol/src/noise-kat.fixture.ts`; Node, Worker, and browser tests import the same
 fixture. Production handshakes must use CSPRNG-generated ephemeral keys.
 
+The implementation is also checked against the independent cacophony vector for
+`Noise_IK_25519_ChaChaPoly_SHA256` from
+`https://raw.githubusercontent.com/centromere/cacophony/master/vectors/cacophony.txt`, vector index 154. That vector verifies the two handshake ciphertexts, the final handshake hash, and the first two
+transport messages in each direction.
+
 Noise `ChaChaPoly` is the Noise spec cipher suite and uses a 96-bit nonce formed from 32 zero bits
 plus the 64-bit little-endian Noise nonce. This is intentionally separate from business payload
 XChaCha20-Poly1305, which remains defined in the payload-key section below.
 
+The Worker self-test route is protected by a runtime environment flag and the provisional secret. It
+is not currently removed from the production bundle at compile time. Production deployments must
+leave `CRC_ENABLE_SELF_TEST` unset.
+
 The Phase 1 control-plane KAT only proves opaque byte encryption/decryption and associated-data
 binding over the split Noise transport state. It does not define Stage 3 business message schemas
 such as payload-key issue, revoke, or epoch rotate.
+
+The Phase 1 export construction is HKDF-SHA256:
+
+- `ikm = empty bytes`
+- `salt = final Noise chaining key`
+- `info = export label`
+- `length = 32 bytes`
 
 The Phase 1 export label is:
 

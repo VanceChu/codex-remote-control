@@ -36,6 +36,16 @@ describe("Noise KAT self-test route", () => {
     });
   });
 
+  it("returns 501 when enabled without a configured secret", () => {
+    const request = new Request("https://relay.example/__crc/self-test/noise-kat");
+
+    expect(authorizeSelfTestRequest(request, env({ CRC_ENABLE_SELF_TEST: "1" }))).toEqual({
+      ok: false,
+      status: 501,
+      message: "Self-test auth is not configured"
+    });
+  });
+
   it("returns the shared Noise KAT result with the correct gate and secret", async () => {
     const request = new Request("https://relay.example/__crc/self-test/noise-kat", {
       headers: { "x-crc-dev-secret": "secret" }
